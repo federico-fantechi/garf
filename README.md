@@ -1,7 +1,7 @@
 # GARF: Group-Aware Random Forest matching for panel counterfactuals
 
-<!-- After the first Zenodo release, add the DOI badge here:
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX) -->
+
+[![DOI](https://zenodo.org/badge/1461156657.svg)](https://doi.org/10.5281/zenodo.24303485)
 
 GARF builds the comparison group for a policy evaluation with panel data. It
 encodes each unit's pre-treatment history as levels and trajectory descriptors,
@@ -83,7 +83,7 @@ If you use GARF, please cite the paper and the software:
 > arXiv:XXXX.XXXXX.
 
 > Fantechi, F. (2026). *GARF: Group-Aware Random Forest matching for panel
-> counterfactuals* (version 1.1). Zenodo. https://doi.org/10.5281/zenodo.XXXXXXX
+> counterfactuals* (version 1.1). Zenodo. https://doi.org/10.5281/zenodo.24303486
 
 GitHub's "Cite this repository" button gives the same in BibTeX.
 

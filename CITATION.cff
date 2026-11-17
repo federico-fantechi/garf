@@ -8,13 +8,13 @@ version: "1.1"
 date-released: "2026-11-17"      
 license: MIT
 repository-code: "https://github.com/federico-fantechi/garf" 
-# doi: 10.5281/zenodo.XXXXXXX    # ADD after the first Zenodo release (concept DOI)
+doi: 10.5281/zenodo.24303486   
 authors:
   - family-names: Fantechi
     given-names: Federico
     affiliation: "Department of Economics, Business and Statistics, University of Palermo"
     email: federico.fantechi@unipa.it
-    # orcid: "https://orcid.org/0000-0001-5323-0596"     
+    orcid: "https://orcid.org/0000-0001-5323-0596"     
 keywords:
   - matching
   - random forest
