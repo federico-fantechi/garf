@@ -1,0 +1,45 @@
+# =====================================================================
+# GARF (binary) config.  Edit the values, then run the tool.
+# Paths are relative to this 'engine' folder.
+# =====================================================================
+
+# ---- data -----------------------------------------------------------
+data_path: input/panel.csv   # put your panel CSV in the 'input' folder
+id_col: id                   # unit identifier column
+year_col: year               # time column
+treat_col: W                 # binary treatment column (0/1)
+outcome_col: Y               # outcome column
+x_time_varying: [x1, x2]     # covariates that change over time (get lags + trajectory features)
+x_time_invariant: [region]   # covariates that don't change (strings are fine, no encoding needed)
+
+# ---- design ---------------------------------------------------------
+treatment_year: 2000         # T0: first treated period
+n_pre_years: 5               # pre-window length used for matching: [T0 - n, T0 - 1]
+include_treatment_year: false
+
+# ---- matching -------------------------------------------------------
+# Two ways to choose each treated unit's controls; they COMBINE:
+k_matches: 50                # keep at most this many nearest donors (k-NN); null or 0 = no cap
+caliper: 0.0                 # keep only donors with MIN-MAX NORMALISED proximity >= caliper
+                              # (range [0,1]; 0 = off). See proximity_minmax in the outputs.
+with_replacement: true       # true = donors reusable across treated units (recommended)
+weight_power: 1              # donor weights ~ proximity^weight_power (1 = proportional,
+                             # 0 = uniform k:1, >1 = more weight on the closest donors)
+
+# ---- hyperparameter tuning (model selection) ------------------------
+tune: false                  # false = fast (uses the fixed forest below)
+                             # true  = SLOW: cross-validated randomized search
+tuning_metric: combined      # accuracy | f1_treated | combined
+n_iter_search: 40            # candidates tried when tuning
+cv_folds: 5                  # cross-validation folds when tuning
+
+# ---- forest defaults (used when tune: false) ------------------------
+n_estimators: 1000
+min_samples_leaf: 5
+max_features: sqrt           # sqrt | log2 | a fraction like 0.5
+max_depth: null              # null = unlimited
+random_state: 42
+
+# ---- output ---------------------------------------------------------
+out_dir: output              # results are written into the 'output' folder
+progress: true               # live progress + timing in the terminal

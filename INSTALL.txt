@@ -1,0 +1,76 @@
+=======================================================================
+Installing the prerequisites
+=======================================================================
+
+GARF (binary) needs Python 3.10 or newer. That is the ONLY thing you install by
+hand — the run scripts install the Python packages automatically, into a shared
+.venv folder, the first time you run them. Nothing is installed system-wide.
+
+Check whether you already have Python:
+  Windows:        open Command Prompt, type:   py --version
+  macOS / Linux:  open Terminal, type:         python3 --version
+If it prints "Python 3.10" (or newer), you're done — go back to README.txt.
+
+
+-----------------------------------------------------------------------
+Windows
+-----------------------------------------------------------------------
+1. Go to  https://www.python.org/downloads/windows/  and download the latest
+   Python 3.x "Windows installer (64-bit)".
+2. Run it. ON THE FIRST SCREEN, TICK "Add python.exe to PATH" (bottom of the
+   window) before clicking "Install Now". This matters.
+3. Open a NEW Command Prompt and check:  py --version
+4. Back to README.txt -> open demo\run_demo.bat.
+
+Alternative from a terminal:  winget install Python.Python.3.12
+
+
+-----------------------------------------------------------------------
+macOS
+-----------------------------------------------------------------------
+1. Go to  https://www.python.org/downloads/macos/  and download the latest
+   macOS 64-bit universal2 installer.
+2. Open the .pkg and click through it.
+3. Open a NEW Terminal and check:  python3 --version
+4. In Terminal, cd into the demo folder, run  chmod +x ../*.sh ../**/*.sh  once,
+   then  ./run_demo.sh
+
+If you use Homebrew instead:  brew install python  gives you python3.
+
+
+-----------------------------------------------------------------------
+Linux
+-----------------------------------------------------------------------
+Most distributions already ship Python 3. If not, or it is too old:
+  Debian / Ubuntu:  sudo apt update && sudo apt install -y python3 python3-venv python3-pip
+  Fedora:           sudo dnf install -y python3 python3-pip
+  Arch:             sudo pacman -S python
+
+Then in the demo folder:  chmod +x ../*.sh ../**/*.sh  once, and  ./run_demo.sh
+(On Debian/Ubuntu the python3-venv package is required for the shared environment.)
+
+
+-----------------------------------------------------------------------
+What gets installed where
+-----------------------------------------------------------------------
+You install:  Python 3.10+ (system-wide, one time).
+The runner installs automatically, inside this folder's .venv:
+  pandas, numpy, scipy, scikit-learn, PyYAML, tqdm  (from requirements.txt).
+To remove everything the tool added, delete the .venv folder. To remove the tool,
+delete the whole folder.
+
+
+-----------------------------------------------------------------------
+No internet on the test machine?
+-----------------------------------------------------------------------
+The automatic step downloads the packages from PyPI on first run. If the machine
+that will run this has no internet, prepare the packages on one that does (same
+OS / Python):
+  pip download -r requirements.txt -d wheels/
+Copy the wheels/ folder in with everything else, then on the offline machine:
+  python -m venv .venv
+  (activate:  .venv\Scripts\activate  on Windows  |  source .venv/bin/activate  elsewhere)
+  pip install --no-index --find-links wheels -r requirements.txt
+and run the engine directly:
+  cd engine
+  python garf_binary.py --config config.yaml

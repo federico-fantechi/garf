@@ -1,0 +1,33 @@
+# Python environment and caches created by setup/run scripts
+.venv/
+__pycache__/
+*.pyc
+wheels/
+
+# run outputs (keep the folders, not the results)
+engine/output/*
+!engine/output/RESULTS_APPEAR_HERE.txt
+engine/input/*.csv
+demo/output/*
+!demo/output/.gitkeep
+garf_output/
+garf_diagnostics/
+
+# OS / editor
+.DS_Store
+__MACOSX/
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# LaTeX build files of the guide
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+
+# Stata
+*.smcl
+*.stswp

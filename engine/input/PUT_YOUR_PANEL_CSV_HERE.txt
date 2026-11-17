@@ -1,0 +1,11 @@
+Put your panel CSV in THIS folder.
+
+By default config.yaml looks for:   input/panel.csv
+(so the simplest option is to name your file panel.csv and drop it here).
+
+If your file has a different name, either rename it to panel.csv, or edit the
+line  data_path: input/panel.csv  in ../config.yaml to match your file name.
+
+The CSV must be a long-format panel: one row per unit-year, with at least the
+columns named in config.yaml (id, year, treatment 0/1, outcome, and covariates).
+You can delete this note.

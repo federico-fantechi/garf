@@ -1,0 +1,11 @@
+# Normalise line endings so scripts work whatever OS they are cloned on
+* text=auto
+*.sh    text eol=lf
+*.bat   text eol=crlf
+*.ado   text eol=lf
+*.sthlp text eol=lf
+*.do    text eol=lf
+*.pkg   text eol=lf
+*.toc   text eol=lf
+*.py    text eol=lf
+*.pdf   binary

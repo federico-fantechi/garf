@@ -1,0 +1,43 @@
+# =====================================================================
+# GARF (binary) DEMO config — points at the synthetic panel that
+# make_example.py generates into this demo's 'input' folder.
+# =====================================================================
+
+# ---- data -----------------------------------------------------------
+data_path: input/panel.csv
+id_col: id
+year_col: year
+treat_col: W
+outcome_col: Y
+x_time_varying: [x1, x2]
+x_time_invariant: [region]
+
+# ---- design ---------------------------------------------------------
+treatment_year: 2000
+n_pre_years: 5
+include_treatment_year: false
+
+# ---- matching -------------------------------------------------------
+k_matches: 50                # k-NN cap; null or 0 = no cap
+caliper: 0.0                 # keep only donors with MIN-MAX NORMALISED proximity >= caliper
+                              # (range [0,1]; 0 = off). See proximity_minmax in the outputs.
+with_replacement: true
+weight_power: 1              # donor weights ~ proximity^weight_power (1 = proportional,
+                             # 0 = uniform k:1, >1 = more weight on the closest donors)
+
+# ---- hyperparameter tuning ------------------------------------------
+tune: false                  # keep the demo fast; set true to watch tuning run
+tuning_metric: combined
+n_iter_search: 20
+cv_folds: 5
+
+# ---- forest defaults ------------------------------------------------
+n_estimators: 1000
+min_samples_leaf: 5
+max_features: sqrt
+max_depth: null
+random_state: 42
+
+# ---- output ---------------------------------------------------------
+out_dir: output
+progress: true

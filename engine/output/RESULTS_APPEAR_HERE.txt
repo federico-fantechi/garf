@@ -1,0 +1,1 @@
+Results from a garf run appear here (matched_panel.csv, matches.csv, balance.csv, diagnostics.json, features.csv).

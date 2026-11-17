@@ -1,0 +1,33 @@
+# Shown by GitHub as "Cite this repository". Keep in step with .zenodo.json:
+# when both files exist, Zenodo reads .zenodo.json and ignores this one.
+cff-version: 1.2.0
+message: "If you use GARF, please cite the software and the paper below."
+type: software
+title: "GARF: Group-Aware Random Forest matching for panel counterfactuals (Stata command and Python engine)"
+version: "1.1"                   
+date-released: "2026-11-17"      
+license: MIT
+repository-code: "https://github.com/federico-fantechi/garf" 
+# doi: 10.5281/zenodo.XXXXXXX    # ADD after the first Zenodo release (concept DOI)
+authors:
+  - family-names: Fantechi
+    given-names: Federico
+    affiliation: "Department of Economics, Business and Statistics, University of Palermo"
+    email: federico.fantechi@unipa.it
+    # orcid: "https://orcid.org/0000-0001-5323-0596"     
+keywords:
+  - matching
+  - random forest
+  - panel data
+  - causal inference
+  - policy evaluation
+  - Stata
+preferred-citation:
+  type: unpublished
+  title: "Matching Histories, not Just Averages: GARF, Group-Aware Random Forest for Counterfactuals Identification in Panel Data"  
+  authors:
+    - family-names: Fantechi
+      given-names: Federico
+  year: 2026
+  notes: "Working paper, University of Palermo"
+  # url: "https://arxiv.org/abs/XXXX.XXXXX"               # ADD after arXiv

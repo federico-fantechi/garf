@@ -1,0 +1,949 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper,top=2.4cm,bottom=2.4cm,left=2.6cm,right=2.6cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,array,tabularx}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{parskip}
+
+\definecolor{ink}{RGB}{28,32,38}
+\definecolor{accent}{RGB}{20,72,168}
+\definecolor{codebg}{RGB}{244,246,249}
+\definecolor{conbg}{RGB}{29,33,40}
+\definecolor{congreen}{RGB}{150,230,170}
+\definecolor{rule}{RGB}{210,216,224}
+\definecolor{cmt}{RGB}{110,120,132}
+
+\usepackage[colorlinks=true,linkcolor=accent,urlcolor=accent,citecolor=accent]{hyperref}
+
+\titleformat{\section}{\Large\bfseries\color{ink}}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\large\bfseries\color{ink}}{\thesubsection}{0.5em}{}
+\titlespacing*{\section}{0pt}{1.4em}{0.5em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.3em}
+
+\pagestyle{fancy}\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{rule}\leaders\hrule height \headrulewidth\hfill}}
+\fancyhead[L]{\small\color{cmt}GARF for Stata — Installation \& Use Guide}
+\fancyhead[R]{\small\color{cmt}\thepage}
+
+% ---- code (Stata) ----
+\lstdefinestyle{stata}{
+  backgroundcolor=\color{codebg}, basicstyle=\ttfamily\small\color{ink},
+  breaklines=true, breakatwhitespace=true, columns=fullflexible,
+  keepspaces=true, frame=single, framerule=0pt, rulecolor=\color{codebg},
+  xleftmargin=8pt, xrightmargin=8pt, aboveskip=6pt, belowskip=6pt,
+  commentstyle=\color{cmt}\itshape, morecomment=[l]{*}, morecomment=[l]{//},
+}
+% ---- console (dark) ----
+\lstdefinestyle{console}{
+  backgroundcolor=\color{conbg}, basicstyle=\ttfamily\small\color{congreen},
+  breaklines=true, columns=fullflexible, keepspaces=true,
+  frame=single, framerule=0pt, rulecolor=\color{conbg},
+  xleftmargin=8pt, xrightmargin=8pt, aboveskip=6pt, belowskip=6pt,
+}
+\lstnewenvironment{stata}{\lstset{style=stata}}{}
+\lstnewenvironment{console}{\lstset{style=console}}{}
+\newcommand{\opt}[1]{\texttt{\textbf{#1}}}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\begin{document}
+
+% ---------------- title ----------------
+\thispagestyle{empty}
+\begin{center}
+{\Huge\bfseries\color{ink} GARF for Stata}\\[0.4em]
+{\Large\color{accent} Installation \& Use Guide}\\[1.0em]
+{\large The \texttt{garf} command — forest-proximity matching for panel counterfactuals}\\[0.4em]
+{\color{cmt}\small Binary build · \textbf{version 1.1} · this guide covers the \texttt{garf.ado} command}\\[0.7em]
+{\small Federico Fantechi, PhD · Department of Economics, Business and Statistics · University of Palermo}\\[0.15em]
+{\small \texttt{federico.fantechi@unipa.it}}
+\end{center}
+\vspace{0.6em}
+\hrule height 0.4pt
+\vspace{0.4em}
+
+\begin{center}
+\fcolorbox{accent}{codebg}{\parbox{0.94\textwidth}{\small
+\textbf{Version 1.1} is the first public release. It is the development build beta~1.5 with three changes to the Stata command: names and paths are quoted in the configuration file passed to the engine, the data are exported without value labels, and the temporary copy of the data is erased after the run. The notes below keep the development numbering.
+
+\medskip
+\textbf{New in beta 1.5.} Forest Match Quality is normalised by the best donor \emph{attainable}
+in the data, so that 1 means ``every donor as close as the closest untreated unit available''
+and its level no longer depends on the sample size or the leaf size (\S\ref{sec:fmq}); the
+earlier version is still returned as \code{r(fmq\_twin\_mean)}. In \code{DIAGNOSTICS}, the widest
+design of the sensitivity grid is the setting \code{KWIDE}, default \code{k(1000)}.
+
+\smallskip
+\textbf{New in beta 1.4.} No change to the command or to the computations: results are
+identical to beta 1.3. The package now ships the folder \code{DIAGNOSTICS}: commented do-files,
+one per diagnostic, for the full design-stage protocol (\S\ref{sec:diagnostics}). It replaces the
+old testing do-files.
+
+\smallskip
+\textbf{New in beta 1.3.} A leaner encoding: each time-varying variable now gives $L+7$
+features instead of $L+9$, because the first and last level of the window, exact copies of two
+lags, are no longer repeated (results therefore differ slightly from beta 1.2). Growth is now
+\emph{symmetric} growth, (last $-$ first)$/$((|last| + |first|)$/2$), defined for zeros and negative
+values. The forest's fit is now reported honestly, from its \emph{out-of-bag} predictions:
+balanced accuracy \code{r(oob\_bacc)} and AUC \code{r(oob\_auc)}; the in-sample \code{r(auc)} was
+removed. The legacy option \opt{minprox()} (use \opt{caliper()}) and the unused option
+\opt{load} were removed.
+
+\smallskip
+\textbf{New in beta 1.2.} \opt{wpower(\#)} sets the donor weights to
+$\text{proximity}^{\#}$, normalised within each treated unit (\S\ref{sec:proxcalc}); the default
+\opt{wpower(1)} reproduces the beta 1.1 weights exactly, \opt{wpower(0)} gives uniform $k$:1
+weights. Engine fixes: \opt{noreplacement} now matches the hardest-to-match treated units first;
+the matched $|$SMD$|$ now compares only the matched treated units with their donors. The
+time-invariant option now abbreviates to \opt{tin()} (it clashed with \opt{time()}). New
+diagnostic: \textbf{Forest Match Quality (FMQ)}, \S\ref{sec:fmq} --- it systematically rewards fewer,
+closer donors, so read it together with ESS.
+
+\smallskip
+\textbf{Changed in beta 1.1.} \opt{caliper()} now filters on a
+\textbf{min-max normalised} proximity, on a fixed $[0,1]$ scale, instead of the raw
+leaf-proximity kernel used in beta 1.0 --- see \S\ref{sec:proxcalc}. \textbf{A caliper value
+chosen under beta 1.0 does not carry over}; re-pick it using the new \code{proximity\_minmax}
+column/variable. The raw \code{proximity} column is unchanged.}}
+\end{center}
+\vspace{0.4em}
+
+{\small
+\textbf{In one line.} \code{garf} runs the \emph{Group Aware Random Forest} Python engine from
+inside Stata and brings the results back: you give it a panel and it returns a \emph{matched
+donor panel} ready for a weighted difference-in-differences.
+
+\smallskip
+\noindent The \emph{Group Aware Random Forest} (GARF) identifies matching (untreated)
+observations over a very large set of covariates, where linear models (e.g.\ propensity scores)
+often fail; \emph{group awareness} lets the matching run over a panel structure --- matching not
+only the \emph{levels} of each covariate but also their \emph{dynamics}; and GARF is highly
+flexible, adjustable for issues such as a low number of treated units and feature selection, with
+parameters that can be tuned for better precision.
+
+\smallskip
+\noindent It does not estimate the treatment effect itself --- that stays in Stata, in your hands.}
+
+\vspace{0.4em}
+\hrule height 0.4pt
+\vspace{0.8em}
+
+{\small\tableofcontents}
+\vspace{0.6em}
+
+% =====================================================================
+\section{What this is, and how it works}
+
+\code{garf} is a thin Stata wrapper (\code{garf.ado}) around the Python engine
+\code{garf\_binary.py} that ships with the \textbf{GARF-binary} package. Stata does not
+re-implement the method; it drives the same Python code, so \emph{no features are lost} ---
+including optional hyperparameter tuning.
+
+When you run \code{garf}, the command:
+\begin{enumerate}[leftmargin=1.5em,itemsep=1pt,topsep=2pt]
+\item exports the panel currently in memory (honouring \code{if}/\code{in}) to a temporary CSV;
+\item writes a configuration file from the options you passed;
+\item shells out to the Python engine, which fits the random forest, builds the leaf-proximity
+      kernel, and selects each treated unit's \code{k} nearest control ``donors'';
+\item reads the results back and prints a matching summary, storing key numbers in \code{r()};
+\item \textbf{by default loads the matched panel into memory} (saving no files) so you can run
+      the DiD immediately; \code{store} / \code{export()} additionally write the CSV outputs.
+\end{enumerate}
+
+The division of labour is deliberate: \textbf{GARF selects the comparison group; you estimate
+the effect.} The natural boundary is exactly the language boundary --- Python builds the
+matched panel, Stata runs the weighted DiD (\code{reghdfe}, \code{xtreg}, \code{didregress}).
+
+\medskip
+\noindent\textbf{Why the shell-out design.} It reuses the package's own Python environment
+(\code{.venv}), so you do \emph{not} have to configure Stata's built-in Python. Any Stata that
+can run \code{shell} works, on Windows, macOS, or Linux.
+
+% =====================================================================
+\section{Requirements}
+
+\begin{itemize}[leftmargin=1.5em,itemsep=2pt,topsep=2pt]
+\item \textbf{Stata 14 or newer} (uses \code{export/import delimited}, \code{shell},
+      \code{file}, \code{regexm}).
+\item \textbf{Python 3.10+} with the package dependencies. The easiest way to get them is to
+      run the package's \code{setup} once (next section): it builds a local \code{.venv} that
+      \code{garf} finds automatically.
+\item The \textbf{GARF-binary package} folder, unzipped somewhere stable.
+\item For the DiD step, \code{reghdfe} is convenient (\code{ssc install reghdfe}); plain
+      \code{xtreg}/\code{areg} also work.
+\end{itemize}
+
+You do \emph{not} need Stata's Python integration (\code{python:}); \code{garf} uses
+\code{shell}, not \code{python:}.
+
+% =====================================================================
+\section{Installation (one-time)}
+
+\subsection{Step 1 --- set up the Python environment}
+From the \textbf{GARF-binary} folder, run the setup once. This creates \code{.venv} and
+installs the dependencies; nothing is installed system-wide.
+\begin{stata}
+* macOS / Linux (Terminal, inside the GARF-binary folder):
+./setup.sh
+
+* Windows: double-click  setup.bat
+\end{stata}
+If you do not have Python yet, follow \code{INSTALL.txt} in the package first.
+
+\subsection{Step 2 --- put garf.ado on Stata's ado-path}
+Two choices.
+
+\textbf{(a) Just for this session} --- add the folder to the ado-path:
+\begin{stata}
+adopath + "C:/Users/you/GARF-binary/integrations/stata"   // Windows
+adopath + "/Users/you/GARF-binary/integrations/stata"     // macOS / Linux
+\end{stata}
+
+\medskip
+\noindent{\color{accent}\textbf{The path must end in \code{/stata}}} --- the folder that
+actually contains \code{garf.ado} and \code{garf.sthlp}. Stata's ado-path is \emph{not}
+recursive: adding the parent \code{.../integrations} will \emph{not} work, and both
+\code{help garf} and the \code{garf} command will appear to be missing. Confirm it is found
+with:
+\begin{stata}
+which garf     // should print the path to garf.ado
+\end{stata}
+
+\textbf{(b) Permanently} --- copy \code{garf.ado} and \code{garf.sthlp} into your PERSONAL
+ado folder. Find it with:
+\begin{stata}
+sysdir
+\end{stata}
+and copy the two files into the folder shown next to \code{PERSONAL} (create it if needed).
+Stata will then find \code{garf} in every session. Keep the \code{GARF-binary} folder itself in a
+fixed place: \code{garf} finds the engine through \code{GARF\_HOME} (Step 3).
+
+\medskip
+\noindent{\color{accent}\textbf{Check which version runs.}} Stata looks for \code{garf.ado} in
+the \emph{current} folder before the ado-path, so an old copy left in a working folder silently
+takes precedence over the one in PERSONAL. After installing or updating, run
+\begin{stata}
+discard        // drop any garf already loaded in this session
+which garf     // the first line must read: version 1.1
+\end{stata}
+
+\subsection{Step 3 --- point Stata at the package}
+\code{garf} needs to know where the engine lives. Set a global once:
+\begin{stata}
+global GARF_HOME "C:/Users/you/GARF-binary"   // Windows (forward slashes are fine)
+global GARF_HOME "/Users/you/GARF-binary"     // macOS / Linux
+\end{stata}
+To make it automatic, add that \code{global} line (and, if you chose 2(a), the \code{adopath}
+line) to your \code{profile.do}, which Stata runs at startup.
+
+\subsection{Step 4 --- verify}
+\begin{stata}
+which garf     // prints the path to garf.ado if the ado-path is right
+help garf      // opens the help file
+\end{stata}
+If either comes up empty, the ado-path line is pointing at the wrong folder --- re-check that it
+ends in \code{/stata} (previous step). For an end-to-end check, run the package demo once (it writes
+\code{demo/input/panel.csv}), then:
+\begin{stata}
+import delimited "$GARF_HOME/demo/input/panel.csv", clear varnames(1) case(preserve)
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2) tinvariant(region)
+\end{stata}
+
+% =====================================================================
+\section{Quick start}
+
+With a long panel in memory (one row per unit-year, a 0/1 treatment column that is 1 in the
+treated unit's treated years):
+\begin{stata}
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) ///
+      tvarying(x1 x2) tinvariant(region) k(50)
+\end{stata}
+You will see a summary like this (numbers are from the synthetic demo panel):
+\begin{console}
+[garf] engine : /Users/you/GARF-binary/engine/garf_binary.py
+[garf] python : /Users/you/GARF-binary/.venv/bin/python
+[garf] tuning : off   k=50   caliper=0 (normalised)   wpower=1   replacement=true
+[garf] running... (this can take a while when tuning is ON)
+--------------------------------------------------------------
+GARF (binary) - matching summary
+--------------------------------------------------------------
+Treated units              =        60
+Control units              =       240
+Treated matched            =        60
+Distinct donors used       =       129
+Mean |SMD| (raw -> matched)= 1.013  ->  0.428
+Max  |SMD| (raw -> matched)= 2.197  ->  0.893
+Mean ESS per treated       =   5.6 / 50
+Match quality FMQ mean/p10 = 0.630 / 0.556   (all treated: 0.630)
+  FMQ: 0 = donors no closer than random controls, 1 = as close as the best attainable donor.
+  Fewer/closer donors systematically raise it: compare designs together with ESS.
+Forest OOB bal.acc / AUC   = 0.958 / 0.993   (OOB accuracy 0.963)
+  Near 0.5 = treatment hard to predict (good overlap); near 1 = groups separable.
+  With rare treatment read the AUC first: balanced accuracy can stay near 0.5.
+--------------------------------------------------------------
+outputs: /Users/you/current-folder/garf_output
+--------------------------------------------------------------
+\end{console}
+Read the balance line as the headline: matching cut the mean absolute standardized
+difference from 1.10 to 0.42. The effective sample size (ESS) per treated unit is well below
+\code{k} because good donors are reused --- that is expected, and worth reporting.
+
+By default the matched panel is now \emph{in memory} and nothing was written to disk; the next
+sections show the variables it adds and how to estimate the DiD. This replaces the data in
+memory, so \code{preserve} or save first; add \code{store} to also keep the CSVs.
+
+% =====================================================================
+\section{Command reference}
+
+\subsection{Syntax}
+\begin{stata}
+garf [if] [in], treatment(varname) outcome(varname) id(varname)
+     time(varname) t0(#) [ options ]
+\end{stata}
+
+\subsection{Required options}
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+Option & Meaning\\
+\midrule
+\opt{treatment(varname)} & binary treatment column (1 in treated years, else 0)\\
+\opt{outcome(varname)}   & the outcome variable\\
+\opt{id(varname)}        & unit identifier\\
+\opt{time(varname)}      & time variable\\
+\opt{t0(\#)}             & treatment onset period $T_0$\\
+\bottomrule
+\end{tabularx}
+
+\subsection{Design options}
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+Option & Meaning (default)\\
+\midrule
+\opt{tvarying(varlist)}   & covariates that change over time; get lags \emph{and} trajectory features\\
+\opt{tinvariant(varlist)} & covariates that do not change (strings/categoricals allowed --- no encoding)\\
+\opt{npre(\#)}            & pre-window length used for matching: $[T_0-\text{npre},\,T_0-1]$ (5)\\
+\opt{includet0}          & include the onset year in the pre-window (off)\\
+\bottomrule
+\end{tabularx}
+
+\subsection{Matching options (donor selection)}
+Two rules pick each treated unit's controls, and they \textbf{combine} (see the note below).
+
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+Option & Meaning (default)\\
+\midrule
+\opt{k(\#)}          & keep at most this many nearest donors --- k-NN (50)\\
+\opt{caliper(\#)}    & keep only donors with \emph{normalised} proximity $\ge$ \# (range $[0,1]$;
+\code{0} = off). Composes with \code{k}\\
+\opt{nokcap}         & lift the \code{k} cap: keep \emph{all} donors within the caliper\\
+\opt{noreplacement}  & match without replacement, hardest-to-match treated units first (default is \emph{with} replacement)\\
+\opt{wpower(\#)}     & donor weights $\propto \text{proximity}^{\#}$, summing to 1 per treated unit (1; 0 = uniform $k$:1; $>1$ = more weight on the closest donors)\\
+\bottomrule
+\end{tabularx}
+
+\medskip
+\noindent\textbf{k-NN vs.\ caliper.} By default GARF keeps each treated unit's \code{k} nearest
+donors. A \emph{caliper} instead keeps every donor whose \emph{min-max normalised} proximity
+(\S\ref{sec:proxcalc}) is at least \code{caliper}, so the number of donors varies across treated
+units --- and can fall to zero for a unit with no good match, which is an honest overlap signal,
+not a bug. A donor must also have actually co-occurred with the treated unit at least once (raw
+proximity $>0$); that floor applies regardless of the caliper. The two rules compose:
+\code{caliper(0.3) nokcap} keeps all donors within the caliper; \code{caliper(0.3) k(50)} keeps
+the 50 nearest \emph{among} those within it. A tighter (larger) caliper trades donors for quality
+--- fewer, closer controls, better balance, smaller effective samples --- so always report how
+many survive (the ESS line, \S\ref{sec:interpret}). Because the caliper is on a fixed $[0,1]$
+scale rather than a forest-size-dependent raw number, \code{caliper(0.3)} means the same thing
+--- a pair at least 30\% of the way from the least similar to the most similar pair observed in
+this run --- across different specifications; see \S\ref{sec:proxcalc} for exactly how that
+scale is built. (This is a rescaling of the \emph{range}, not a percentile: because most pairs
+tend to sit near the low end and a few near the top, do not read \code{caliper(0.3)} as
+``keeps 70\% of donors'' --- always check how many actually survive.)
+
+\subsection{How proximity, weight, and the normalised proximity are calculated}\label{sec:proxcalc}
+
+Three related numbers come out of the matching step, and they answer different questions.
+Getting them mixed up is the easiest way to misread a GARF run, so this section gives all three
+formulas explicitly.
+
+\medskip
+\noindent\textbf{1. Proximity (raw) --- ``how close is this pair, as the forest sees it.''}
+For treated unit $i$ and control $j$, over the $B$ trees of the fitted forest,
+\[
+\text{proximity}(i,j) \;=\; \frac{1}{B}\sum_{b=1}^{B}
+\frac{\mathbf{1}\{\text{leaf}_b(i) = \text{leaf}_b(j)\}}{\#\{\text{controls in that leaf of tree } b\}}.
+\]
+Push $i$ and $j$ down every tree; each tree contributes $1/(\text{leaf size})$ if they land in the
+same terminal leaf, $0$ otherwise; average over trees. This is Breiman's leaf-proximity idea, read
+as an adaptive nearest-neighbour kernel (Lin and Jeon, 2006): a pair that keeps landing together
+in small, tight leaves is close under the metric the forest actually learned. It is $0$ for a pair
+that never once shares a leaf, and \textbf{higher means closer} --- the opposite convention from a
+distance. Its absolute size is \emph{not} comparable across runs: it shrinks as \opt{minleaf()}
+falls, moves with \opt{nestimators()}, and depends on how many covariates are in play, so
+\code{proximity = 0.03} can be a strong match in one specification and a weak one in another.
+
+\medskip
+\noindent\textbf{2. Proximity, min-max normalised --- ``how close is this pair, on a fixed
+0--1 scale.''} New in beta 1.1. The raw proximity matrix for the whole run is rescaled
+\emph{once}, \emph{globally}:
+\[
+\text{proximity\_minmax}(i,j) \;=\; \frac{\text{proximity}(i,j) - \min}{\max - \min},
+\]
+where $\min$ and $\max$ are the smallest and largest raw proximity value anywhere in the entire
+treated~$\times$~control matrix produced by that run (reported as \code{proximity\_raw\_min} /
+\code{proximity\_raw\_max} in \code{diagnostics.json}). This is a \emph{global} rescaling, not a
+per-treated-unit one, and that is a deliberate choice, not an implementation shortcut:
+normalising each treated unit's row by its \emph{own} maximum would send every unit's
+best-available donor to $1.0$ regardless of how poor that donor actually is, which would erase
+the one signal that tells you a treated unit has no good match anywhere in the control pool. With
+a single global $(\min,\max)$, \code{proximity\_minmax}$=1$ is reserved for the single closest
+pair observed anywhere in the run, so a unit whose best donor is mediocre still gets a mediocre
+score. \textbf{\opt{caliper()} filters on this scale}, which is why it now means the same thing
+across specifications with different forest sizes, leaf sizes, or covariate sets --- the raw
+scale never did.
+
+\medskip
+\noindent\textbf{3. Weight (design weight) --- ``how much does this donor count, within its
+own treated unit's block.''} Within the donors actually kept for treated unit $i$, the \emph{raw}
+proximities, raised to the power $\gamma$ set by \opt{wpower()}, are renormalised to sum to 1:
+\[
+\text{weight}(i,j) \;=\; \frac{\text{proximity}(i,j)^{\gamma}}{\sum_{j' \in \mathcal{N}(i)} \text{proximity}(i,j')^{\gamma}},
+\qquad \gamma=\text{\opt{wpower()}}\ (\text{default } 1),
+\]
+where $\mathcal{N}(i)$ is the donor set finally selected for $i$ (after the caliper and/or $k$
+cap have been applied). With $\gamma=1$ the weight is proportional to proximity (the only
+choice before beta 1.2); with $\gamma=0$ every selected donor gets the same weight (classic
+$k$:1 matching); with $\gamma>1$ the weight shifts toward the closest donors and tends to
+nearest-neighbour matching as $\gamma$ grows. Raising $\gamma$ lowers the effective sample size,
+so check ESS and balance whenever you change it (on the demo panel with $k=50$: mean ESS
+$\approx 47$ at $\gamma=0$, $5.6$ at $\gamma=1$, $2.7$ at $\gamma=2$). This is what you pass to \code{[pw=weight]} in the DiD step: a
+within-block convex combination that sums to 1 for each treated unit, \emph{not} a 0--1
+``how good is this match'' score --- that role belongs to \code{proximity\_minmax}. A treated
+unit can have a low \code{proximity\_minmax} for its best donor (poor overlap) while its
+\code{weight} column still sums to 1 across whatever donors it did get, so always check
+\code{proximity\_minmax} (or the ESS/balance diagnostics) rather than inferring match quality
+from \code{weight} alone.
+
+\medskip
+\noindent All three are written out by the engine: \code{proximity} and
+\code{proximity\_minmax} in both \code{matches.csv} and \code{matched\_panel.csv} (missing, by
+construction, on treated rows, which have no proximity to themselves); \code{weight} everywhere
+the other two appear, plus as the variable you actually use for estimation.
+
+\subsection{Tuning options (model selection)}
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+Option & Meaning (default)\\
+\midrule
+\opt{tune}              & turn on cross-validated hyperparameter search --- \textbf{slow} (off)\\
+\opt{tuningmetric(str)} & \code{accuracy} $|$ \code{f1\_treated} $|$ \code{combined} (combined)\\
+\opt{niter(\#)}         & number of search candidates (40)\\
+\opt{cvfolds(\#)}       & cross-validation folds (5)\\
+\bottomrule
+\end{tabularx}
+
+\noindent\textbf{Tuning never sees the treatment effect.} Hyperparameters are chosen on the
+forest's own prediction target (out-of-bag / cross-validated), never on the ATT --- by design.
+
+\subsection{Forest defaults (used when \texttt{tune} is off)}
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+Option & Meaning (default)\\
+\midrule
+\opt{nestimators(\#)}   & number of trees (1000)\\
+\opt{minleaf(\#)}       & minimum samples per leaf (5)\\
+\opt{maxfeatures(str)}  & \code{sqrt} $|$ \code{log2} $|$ a fraction like \code{0.5} (sqrt)\\
+\opt{maxdepth(str)}     & \code{null} or an integer (null = unlimited)\\
+\opt{seed(\#)}          & random seed (42)\\
+\bottomrule
+\end{tabularx}
+
+\subsection{Output options}
+By default the matched panel is loaded into memory and \emph{no files are saved}.
+
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+Option & Meaning (default)\\
+\midrule
+\opt{store}        & also save the CSV outputs to \code{./garf\_output}\\
+\opt{export(str)}  & also save the CSV outputs to this folder\\
+\opt{noload}       & do \emph{not} load the matched panel into memory (produce files only)\\
+\bottomrule
+\end{tabularx}
+
+\subsection{Plumbing options}
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+Option & Meaning (default)\\
+\midrule
+\opt{enginedir(str)} & path to the engine folder (else \code{\$GARF\_HOME/engine})\\
+\opt{python(str)}    & Python interpreter to use (else the package \code{.venv}, else system Python)\\
+\opt{outdir(str)}    & folder for saved files; \emph{implies saving} (\code{./garf\_output})\\
+\opt{verbose}        & show the engine's own progress bar / timing\\
+\bottomrule
+\end{tabularx}
+
+% =====================================================================
+\section{What you get back}
+
+\subsection{The on-screen summary}
+Treated / control counts, how many treated units were matched, how many distinct donors were
+used, mean and maximum absolute standardized mean difference (SMD) before and after matching,
+mean ESS per treated unit, Forest Match Quality, and the forest's out-of-bag balanced accuracy and
+AUC, with plain out-of-bag accuracy for reference (plus the CV score when tuning is on).
+
+\subsection{Stored results \texttt{r()}}
+Everything in the summary is returned, so it is scriptable:
+\begin{stata}
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2) tinvariant(region)
+return list
+* r(n_treated) r(n_controls) r(n_treated_matched) r(n_donors)
+* r(mean_smd_raw) r(mean_smd_matched) r(max_smd_raw) r(max_smd_matched)
+* r(mean_ess) r(fmq_mean) r(fmq_p10) r(fmq_mean_all)
+* r(oob_bacc) r(oob_auc) r(oob_score) r(wpower)  [ r(cv_score) if tuned ]
+* r(matched_panel)  r(outdir)   // only when files are saved (store/export/outdir)
+display "balance improved from " r(mean_smd_raw) " to " r(mean_smd_matched)
+\end{stata}
+
+\subsection{Output files (only with \texttt{store} / \texttt{export()} / \texttt{outdir()})}
+By default no files are written. When you ask for them:
+
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+File & Contents\\
+\midrule
+\code{matched\_panel.csv} & long panel (treated + donor rows) with \code{weight}, \code{proximity\_minmax}, \code{cooccurrence}, \code{fmq}, \code{block\_id}, \code{unique\_id} --- ready for a weighted DiD\\
+\code{matches.csv}        & \code{treated\_id}, \code{donor\_id}, \code{rank}, \code{proximity}, \code{proximity\_minmax}, \code{weight}, \code{leaf\_distance}, \code{cooccurrence}\\
+\code{blocks.csv}         & one row per treated unit: \code{matched}, \code{n\_donors}, \code{ess}, \code{match\_cooccurrence}, \code{random\_cooccurrence}, \code{best\_cooccurrence}, \code{fmq}, \code{fmq\_twin}, \code{best\_proximity\_minmax}, \code{overlap\_mass}\\
+\code{balance.csv}        & standardized mean difference per feature, raw vs matched\\
+\code{diagnostics.json}   & config used + all summary numbers + top feature importances\\
+\code{features.csv}       & the unit-level design matrix\\
+\bottomrule
+\end{tabularx}
+
+% =====================================================================
+\section{Reading and interpreting the results}\label{sec:interpret}
+
+Every run prints a short summary (and stores the same numbers in \code{r()}). How to read it:
+
+\medskip
+\noindent\textbf{Balance --- Mean / Max |SMD| (raw $\to$ matched).} The standardized mean
+difference (SMD) is the treated-minus-control gap in a covariate divided by a pooled standard
+deviation, so it is comparable across variables. \emph{Raw} is your starting imbalance (treated
+vs.\ all controls); \emph{matched} is what GARF achieved (treated vs.\ the proximity-weighted
+donors). Matching should pull both toward zero; $|\text{SMD}| < 0.10$ is the usual
+``well balanced'' rule of thumb. The \emph{max} matters as much as the mean --- one badly
+unbalanced covariate is still a problem.
+
+\medskip
+\noindent\textbf{Effective sample size --- Mean ESS per treated.} With proximity weights (and
+donor reuse under with-replacement matching), the donors behind a treated unit are not each worth
+a full observation. The ESS is their effective count. It is normally \emph{well below} \code{k}
+--- that is honest, not a bug --- and you should report it. A very low ESS (say 1--2) means the
+effective comparison group is thin: treat those estimates with care, and consider a looser
+caliper or a larger \code{k}.
+
+\medskip
+\noindent\textbf{Forest Match Quality --- FMQ mean / p10 (all treated).}\label{sec:fmq}
+FMQ summarises, on a 0--1 scale, how close each treated unit's donors are \emph{in the
+forest's own metric}, relative to what the data make possible. Let $c(i,j)$ be the share of trees in which treated unit $i$ and control $j$
+land in the same leaf (column \code{cooccurrence}). For each treated unit,
+\[
+S_i=\sum_{j\in\mathcal N(i)} \text{weight}(i,j)\,c(i,j),\qquad
+\bar c_i=\frac{1}{N_0}\sum_{j\in\text{all controls}} c(i,j),\qquad
+S^{\max}_i=\max_{j\in\text{all controls}} c(i,j),
+\]
+\[
+\text{FMQ}_i=\frac{S_i-\bar c_i}{S^{\max}_i-\bar c_i}.
+\]
+$S_i$ is how often, on average, $i$ shares a leaf with its donors; $\bar c_i$ is what random
+donors would achieve; $S^{\max}_i$ is what the closest untreated unit in the data achieves. FMQ is
+the share of the \emph{attainable} improvement, from ``a random control'' to ``the best donor
+available'', that the matching achieved: $0$ = no closer than random controls, $1$ = every donor as
+close as the best one available. Normalising by the best attainable donor keeps the scale
+comparable across sample sizes: with tens of thousands of units and small leaves no pair shares a
+leaf in most trees, so the earlier version, $(S_i-\bar c_i)/(1-\bar c_i)$, stayed close to 0 even
+for good matches. It is still returned as \code{r(fmq\_twin\_mean)} and per block as
+\code{fmq\_twin}. If no control is closer than the average one ($S^{\max}_i=\bar c_i$), FMQ is
+undefined for that block and counted in \code{r(fmq\_undefined)}. The summary reports the mean
+and 10th percentile over \emph{matched} treated units (\code{r(fmq\_mean)}, \code{r(fmq\_p10)})
+and the mean over \emph{all} treated units with unmatched ones scored 0 (\code{r(fmq\_mean\_all)});
+\code{blocks.csv} and the variable \code{fmq} give the value block by block. It uses only
+pre-treatment information, so it can be used freely while designing the match. Read it with care:
+\begin{itemize}[leftmargin=1.5em,itemsep=1pt,topsep=2pt]
+\item \textbf{It strongly rewards fewer, closer donors.} A smaller \code{k}, a tighter caliper or a
+larger \opt{wpower()} systematically raises FMQ, and \code{k(1)} typically gives the highest value. FMQ measures the
+\emph{closeness} (bias) side of the design only. \textbf{Never choose a design by FMQ alone}: read
+it relative to the number of donors and \emph{together with ESS}, the variance side. A good design
+gives up little FMQ for a large gain in ESS. On the demo panel, for example: \code{k(1)} gives
+FMQ $0.96$ with ESS $1$; \code{k(5)} $0.75$ with ESS $3.4$; \code{k(50)} $0.63$ with ESS $5.6$;
+\code{k(50) wpower(2)} $0.85$ with ESS $2.7$.
+\item \textbf{With a caliper}, unmatched treated units drop out of \code{r(fmq\_mean)}, which can
+rise simply because the hardest units were excluded. Compare caliper designs on
+\code{r(fmq\_mean\_all)}, together with \code{r(n\_treated\_matched)} and ESS.
+\item \textbf{Relative, not absolute.} There is no universal ``good'' threshold. Designs that differ
+only in \code{k}, caliper, \opt{wpower()} or replacement share the same forest (same covariates,
+forest settings and seed) and their FMQ is fully comparable; across covariate sets or forest
+settings it is only roughly comparable.
+\item \textbf{It sees only what the forest sees} --- closeness in the dimensions that predict
+treatment --- so it does not replace the balance table or the pre-treatment outcome path. Blocks
+with FMQ close to 0 have donors no closer than random controls: \code{random\_cooccurrence} tells a
+\emph{typical} unit (high $\bar c_i$: any control is about as close) from an \emph{isolated} one
+(low $\bar c_i$ and low overlap mass).
+\end{itemize}
+A quick way to see the trade-off:
+\begin{stata}
+foreach k in 1 5 10 25 50 {
+    garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2) k(`k') noload
+    display "k=`k'   FMQ=" %5.3f r(fmq_mean) "   ESS=" %5.1f r(mean_ess)
+}
+\end{stata}
+
+\medskip
+\noindent\textbf{Separability --- Forest OOB balanced accuracy / AUC.} These say how easily the
+forest tells treated from control, computed from its \emph{out-of-bag} predictions: each unit is
+scored only by the trees that did not see it, so the numbers are honest. The \emph{balanced
+accuracy} averages the hit rates of the two groups, so $0.5$ means no better than chance whatever
+the share of treated units; the \emph{AUC} is the probability that a random treated unit receives a
+higher out-of-bag score than a random control. Values near $0.5$ mean treatment is hard to predict
+from the history, which is good for overlap. With rare treatment (a few per cent of units), read
+the \textbf{AUC first}: out-of-bag votes then seldom pass the 0.5 threshold, so the balanced
+accuracy can stay close to $0.5$ even when the AUC shows the groups are highly separable (on a
+panel with 1\% treated units: balanced accuracy $0.57$, AUC $0.98$). The plain out-of-bag \emph{accuracy}
+(\code{r(oob\_score)}, in brackets) is kept for reference only: read it against the share of control
+units, which a forest reaches by predicting ``control'' for everyone ($0.80$ in the demo panel).
+A balanced accuracy or AUC close to 1 (say above $0.95$) is an \textbf{overlap warning}: treated
+and controls are almost perfectly distinguishable, the lack-of-positivity problem that afflicts \emph{any} matching method, GARF
+included --- it does not mean the tool is broken. When you see it: check that balance still
+improves and that ESS is not tiny, and look at the top feature importances in
+\code{diagnostics.json} --- if one covariate dominates, ask whether it \emph{mechanically} encodes
+treatment or eligibility (a running variable, an id-like field). If so, matching on it is
+inherently hard, and you must decide whether it belongs in the covariate set.
+
+\medskip
+\noindent\textbf{Pre-trends, not just levels.} Balance on covariate levels is not the whole story
+in a panel: a difference-in-differences needs parallel \emph{pre-trends}. Inspect the outcome and
+covariate dynamics before $T_0$ --- the matched control path should track the treated path in the
+pre-period. This is exactly where matching on the trajectory \emph{shape} is meant to help, and
+it is worth a figure in any write-up.
+
+% =====================================================================
+\section{The diagnostic protocol: the \texttt{DIAGNOSTICS} folder}\label{sec:diagnostics}
+
+The on-screen summary is a starting point. The package folder \code{DIAGNOSTICS} contains the
+full design-stage protocol of the GARF working paper as commented do-files, one per diagnostic.
+Every file uses pre-treatment information only, so the whole protocol can be run, and the design
+revised, before any outcome is analysed.
+
+\medskip
+\noindent\textbf{Run it on the demonstration panel.} Generate the demo panel once
+(\code{demo/run\_demo.sh} or \code{.bat}), \code{cd} to a project folder (not the package
+folder), then:
+\begin{stata}
+do "$GARF_HOME/DIAGNOSTICS/00_master.do"
+\end{stata}
+Tables are printed in the log; data and figures go to \code{./garf\_diagnostics}.
+
+\medskip
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+File & What it does\\
+\midrule
+\code{00\_settings.do} & Data, variable names, $T_0$, window, default $k$, placebo backdating: the only file to edit\\
+\code{00\_master.do} & Runs every step in order\\
+\code{01\_first\_run.do} & Default design; saves \code{raw.dta}, \code{matched.dta}, \code{garf\_output/}\\
+\code{02\_balance\_features.do} & $|$SMD$|$ by variable and component (levels vs dynamics), features that worsen\\
+\code{03\_variance\_ratios.do} & Variance ratios, raw and matched\\
+\code{04\_balance\_over\_time.do} & SMD by period, raw and matched (\code{fig\_balance\_time.pdf})\\
+\code{05\_outcome\_path.do} & Pre-treatment outcome path (\code{fig\_outcome\_path.pdf})\\
+\code{06\_placebo.do} & Out-of-window placebo: design backdated by $H$ periods (\code{fig\_placebo.pdf})\\
+\code{07\_ess\_reuse.do} & ESS per treated unit, donor reuse and concentration of the implied weights\\
+\code{08\_overlap.do} & Best-donor normalised proximity and overlap mass (\code{fig\_overlap.pdf})\\
+\code{09\_fmq\_blocks.do} & FMQ by block with its components, lowest-FMQ units\\
+\code{10\_forest\_importance.do} & Majority-class share and the top features from \code{diagnostics.json}\\
+\code{11\_sensitivity\_grid.do} & 19 designs over $k$, caliper, \opt{wpower()}, replacement and seed (\code{sens.dta}; slow)\\
+\code{12\_frontier.do} & FMQ--ESS frontier (\code{fig\_frontier.pdf})\\
+\bottomrule
+\end{tabularx}
+
+\medskip
+\noindent\textbf{Your own data.} Copy the folder to your project, edit only
+\code{00\_settings.do}, then point Stata at the copy:
+\begin{stata}
+global GARF_DIAG "/path/to/project/DIAGNOSTICS"
+do "$GARF_DIAG/00_master.do"
+\end{stata}
+To run a single step, run \code{00\_settings.do} and \code{01\_first\_run.do} once, then the step.
+
+\medskip
+\noindent\textbf{Large donor pools.} The widest design of the sensitivity grid is the setting
+\code{KWIDE}, default \code{k(1000)}, in \code{00\_settings.do}. On pools below 1{,}000 untreated
+units it is the same as no cap (the forest kernel); on pools of tens of thousands, \opt{nokcap}
+can give thousands of donors per treated unit and a matched panel of tens of millions of rows. Each
+run of the grid builds the features, fits the forest and computes the proximities from scratch, so
+on large data the grid takes hours.
+
+% =====================================================================
+\section{From matched panel to treatment effect}
+
+After a default run the matched (block-expanded) panel is already in memory, and \code{garf} has
+added the variables you need for a weighted DiD:
+\begin{center}\small
+\begin{tabularx}{0.96\textwidth}{@{}lX@{}}
+\toprule
+Variable & Meaning\\
+\midrule
+\code{weight} & proximity weight, normalised within each treated block (use as \code{[pw=weight]})\\
+\code{proximity} / \code{proximity\_minmax} & raw and 0--1-rescaled match quality (\S\ref{sec:proxcalc}); missing for treated rows\\
+\code{treated\_id} / \code{block\_id} & the treated unit each control is matched to\\
+\code{treated\_grp} & 1 = treated unit, 0 = selected control\\
+\code{control\_sel} & 1 = this row is a selected control (donor)\\
+\code{garf\_unit} & numeric id of \code{unique\_id} --- use in \code{absorb()}\\
+\code{garf\_block} & numeric id of \code{block\_id} --- use in \code{vce(cluster )}\\
+\code{post} & 1 if the period is $\ge T_0$\\
+\code{cooccurrence} / \code{fmq} & share of trees in which donor and treated unit share a leaf; block's Forest Match Quality\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+With the standard treatment coding (1 only in the treated unit's treated years), your treatment
+variable is already the treated-times-post indicator, so a proximity-weighted regression of the
+outcome on it with unit and time fixed effects returns the ATT directly:
+\begin{stata}
+preserve                                               // the matched panel replaces your data
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2) tinvariant(region)
+reghdfe Y W [pw=weight], absorb(garf_unit year) vce(cluster garf_block)
+\end{stata}
+\code{[pw=weight]} applies the proximity weights; \code{absorb(garf\_unit year)} are the two-way
+fixed effects (numeric ids are used because the raw \code{unique\_id}/\code{block\_id} are
+strings); clustering on \code{garf\_block} keeps each treated block's rows together.
+
+If instead your treatment variable marks a treated unit in \emph{all} years, build the DiD
+interaction from the added dummies:
+\begin{stata}
+reghdfe Y c.treated_grp#c.post [pw=weight], absorb(garf_unit year) vce(cluster garf_block)
+\end{stata}
+For horizon-by-horizon (event-study) effects, interact \code{treated\_grp} with event-time
+dummies over the post window, still weighted by \code{weight}.
+
+\medskip
+\noindent\textbf{Note.} Loading \emph{replaces} the data in memory --- \code{preserve} or save
+your working data first, or pass \code{noload} to leave it untouched (add \code{store} to write
+the CSVs and read the matched panel later from \code{r(matched\_panel)}).
+
+% =====================================================================
+\section{Studying heterogeneous effects}
+
+GARF matches each treated unit to its \emph{own} set of donors and keeps that link explicit:
+every control row carries the id of the treated unit it was matched to
+(\code{block\_id} / \code{treated\_id}), together with its proximity \code{weight}. That
+structure --- a treated unit \emph{plus its personal pool of controls} --- is what makes
+heterogeneity analysis natural. You can split the treated population however you like (by size,
+sector, region, exposure, \dots) and the correct comparison group follows \emph{automatically}:
+each treated unit's matched donors travel with it into its subgroup. A single pooled control
+group cannot be sliced this way, because it is not tied to any particular treated unit.
+
+The recipe is two steps:
+\begin{enumerate}[leftmargin=1.6em,itemsep=1pt,topsep=2pt]
+\item \textbf{Tag each block} by a characteristic of its treated unit, measured in the
+      \emph{pre-treatment} period (so the grouping is not itself affected by the treatment).
+\item \textbf{Estimate the DiD within each group.} No re-matching is needed --- the controls in a
+      group are exactly that group's matched donors.
+\end{enumerate}
+
+\noindent\textbf{Conceptual example --- effects by firm size.} Suppose \code{employees} is a
+covariate and you want small, medium and large firms separately:
+\begin{stata}
+* 1. label each block by the treated firm's pre-treatment size
+gen s = employees if treated_grp==1 & year < 2016      // treated rows, pre-period only
+bysort block_id: egen size_pre = mean(s)               // assign that size to the whole block
+gen byte sizeclass = 1 if size_pre <= 25               // small
+replace  sizeclass = 2 if size_pre >  25 & size_pre <= 50   // medium
+replace  sizeclass = 3 if size_pre >  50 & !missing(size_pre) // big
+
+* 2. within-group ATT: the controls are that group's matched donors
+forvalues g = 1/3 {
+    reghdfe Y W [pw=weight] if sizeclass==`g', absorb(garf_unit year) vce(cluster garf_block)
+}
+\end{stata}
+Each regression uses only the treated firms in that size band \emph{and their own matched
+controls} --- exactly the comparison you want. The same idea extends to a dynamic
+(event-study) version by interacting the treated indicator with event-time \emph{within} each
+group. One caution: slicing thins the number of treated units per group, so watch the group
+counts (\code{tab sizeclass if treated\_grp==1}) --- small groups give noisy estimates and wide
+confidence intervals.
+
+% =====================================================================
+\section{Worked examples}
+
+\textbf{Default --- load the matched panel into memory, save nothing:}
+\begin{stata}
+preserve
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2) tinvariant(region)
+\end{stata}
+
+\textbf{Also keep the CSV files:}
+\begin{stata}
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2) store
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2) export("C:/work/run1")
+\end{stata}
+
+\textbf{Files only, leave the data in memory untouched:}
+\begin{stata}
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2) noload store
+\end{stata}
+
+\textbf{Hyperparameter tuning (slow) with a chosen metric:}
+\begin{stata}
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) ///
+      tvarying(x1 x2) tinvariant(region) tune tuningmetric(combined) niter(60) cvfolds(5)
+\end{stata}
+
+\textbf{Without replacement, as a robustness check:}
+\begin{stata}
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) ///
+      tvarying(x1 x2) tinvariant(region) k(10) noreplacement
+\end{stata}
+
+\textbf{Custom output folder and an explicit Python interpreter:}
+\begin{stata}
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2) ///
+      outdir("C:/work/garf_run1") python("C:/Python312/python.exe")
+\end{stata}
+
+\textbf{A subset of the panel (via \texttt{if}):}
+\begin{stata}
+garf if country=="IT", treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2)
+\end{stata}
+
+% =====================================================================
+\section{Hyperparameter tuning}
+
+The forest has hyperparameters (number of trees, minimum leaf size, features per split, depth).
+By default GARF uses fixed, sensible values (fast). You can instead let it \emph{choose} them by
+cross-validation --- slower, but it can sharpen the metric.
+
+\medskip
+\noindent\textbf{How.} Add \code{tune} (and, optionally, the knobs):
+\begin{stata}
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2) ///
+      tune tuningmetric(combined) niter(60) cvfolds(5)
+\end{stata}
+\code{niter} is how many random hyperparameter combinations are tried; \code{cvfolds} the number
+of cross-validation folds. More of either is slower but more thorough.
+
+\medskip
+\noindent\textbf{What it optimizes, and why it is safe.} Tuning selects hyperparameters on the
+forest's \emph{own} target (how well it predicts \emph{treatment} out of sample), \emph{never} on
+the treatment effect. The tool never sees the outcome effect, so there is no way to tune the ATT
+--- which is the point, and what keeps the exercise honest.
+
+\medskip
+\noindent\textbf{The metric --- \code{tuningmetric()}.} When tuning, models are ranked by one of
+\code{accuracy}, \code{f1\_treated}, or \code{combined} (the default). Because treatment is
+usually rare, plain \code{accuracy} is a poor criterion: a model that labels everyone a control
+can score $0.95$ while being useless for matching. \code{combined} blends, with equal weights, the treated-class F1
+with balanced accuracy, rewarding models that actually discriminate treated-like from
+control-like units. Prefer \code{f1\_treated} or \code{combined} whenever treated units are a
+small share of the sample.
+
+\medskip
+\noindent\textbf{When to bother.} Tuning helps most when the default forest is clearly mis-sized
+for your data --- very few treated units, very many covariates, or balance that is unstable
+across seeds. For a first pass, leave it off; turn it on for the final specification and report
+that you did.
+
+% =====================================================================
+\section{Changing the engine's defaults}
+
+The Stata options cover the common cases, but the Python engine (\code{engine/garf\_binary.py})
+and its \code{config.yaml} expose everything, and you can edit them directly if you run the
+engine outside Stata or want a different permanent default.
+
+\medskip
+\noindent\textbf{Config values.} \code{engine/config.yaml} lists every setting with a comment
+(forest size, caliper, tuning, paths). Editing it changes the defaults for a direct
+\code{python garf\_binary.py --config config.yaml} run. Note that the Stata command writes its
+\emph{own} config from your options each time, so to change behaviour from Stata you pass options
+--- editing \code{config.yaml} does not affect \code{garf}.
+
+\medskip
+\noindent\textbf{Forest defaults} (trees, leaf size, features, depth) can be set from Stata with
+\code{nestimators()}, \code{minleaf()}, \code{maxfeatures()}, \code{maxdepth()}, or edited in the
+config for a direct run. Bigger forests are steadier but slower; smaller \code{minleaf} makes the
+proximity sharper (and the overlap warning above more likely).
+
+\medskip
+\noindent\textbf{Expert: the model-selection metric.} The \code{combined} score is defined in a
+small function near the top of \code{garf\_binary.py}:
+\begin{stata}
+COMBINED_F1_WEIGHT  = 0.5   # weight on F1 of the treated (positive) class
+COMBINED_BAL_WEIGHT = 0.5   # weight on balanced accuracy
+def combined_metric(y_true, y_pred): ...
+\end{stata}
+This is a deliberate plug-in slot. You may want to change it when the default does not suit your
+design --- for example, with \emph{very few treated units} you might weight the treated-class F1
+more heavily (raise \code{COMBINED\_F1\_WEIGHT}) so the search does not settle for a model that
+looks accurate only because it predicts ``control'' almost everywhere; or you might drop in a
+different criterion entirely. Only the body of that one function changes; nothing else depends on
+it. This is an expert edit --- keep the default unless you have a concrete reason, and report any
+change you make.
+
+% =====================================================================
+\section{How options map to the engine config}
+
+\code{garf} simply writes a \code{config.yaml} for the engine. The mapping (useful if you also
+run the engine directly, or read \code{diagnostics.json}):
+
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+Stata option & config key\\
+\midrule
+\opt{treatment} / \opt{outcome} / \opt{id} / \opt{time} & \code{treat\_col} / \code{outcome\_col} / \code{id\_col} / \code{year\_col}\\
+\opt{t0} / \opt{npre} / \opt{includet0} & \code{treatment\_year} / \code{n\_pre\_years} / \code{include\_treatment\_year}\\
+\opt{tvarying} / \opt{tinvariant} & \code{x\_time\_varying} / \code{x\_time\_invariant}\\
+\opt{k} / \opt{noreplacement} & \code{k\_matches} / \code{with\_replacement}\\
+\opt{wpower} & \code{weight\_power}\\
+\opt{caliper} / \opt{nokcap} & \code{caliper} \quad(\code{nokcap} writes \code{k\_matches: null})\\
+\opt{tune} / \opt{tuningmetric} / \opt{niter} / \opt{cvfolds} & \code{tune} / \code{tuning\_metric} / \code{n\_iter\_search} / \code{cv\_folds}\\
+\opt{nestimators} / \opt{minleaf} / \opt{maxfeatures} / \opt{maxdepth} / \opt{seed} & \code{n\_estimators} / \code{min\_samples\_leaf} / \code{max\_features} / \code{max\_depth} / \code{random\_state}\\
+\opt{outdir} / \opt{verbose} & \code{out\_dir} / \code{progress}\\
+\opt{store} / \opt{export} / \opt{noload} & Stata-side only: whether to keep the CSVs, where, and whether to load into memory (not engine keys)\\
+\bottomrule
+\end{tabularx}
+
+% =====================================================================
+\section{Troubleshooting}
+
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+Message / symptom & Fix\\
+\midrule
+\code{Set the package location first} & \code{global GARF\_HOME "/path/to/GARF-binary"} (or pass \code{enginedir()}).\\
+Error about \code{min\_proximity}, or \code{r(oob\_bacc)} missing & An old \code{garf.ado} is running, often a copy in the current folder: \code{which garf}, delete or rename the old copy, then \code{discard}.\\
+\code{engine not found} & \code{\$GARF\_HOME}/\code{enginedir()} is wrong; point it at the folder that contains \code{engine/garf\_binary.py}.\\
+\code{engine did not produce matched\_panel.csv} & The Python side failed. Run the same call from a terminal to see the error, or pass \code{python("/full/path")} to an interpreter that has \code{pandas}/\code{scikit-learn} (e.g.\ the package \code{.venv}).\\
+\code{Columns not found ...} & A variable name doesn't match; check \code{treatment}/\code{outcome}/covariate names against your data.\\
+Everything dropped & Check \code{t0}, \code{npre}, and that units have a complete pre-window.\\
+Progress bar looks messy in the log & It's off by default in Stata; \code{verbose} turns the engine's own progress back on.\\
+Loading replaced my data & By design --- \code{preserve}/save first, or import the panel later from \code{r(matched\_panel)}.\\
+Windows path issues & Use forward slashes in \code{GARF\_HOME}/\code{outdir()} (they work on Windows); \code{garf} converts them for the shell call.\\
+\bottomrule
+\end{tabularx}
+
+\vfill
+\begin{center}\small\color{cmt}
+GARF-binary · Stata integration · this guide documents \code{garf.ado} \textbf{version 1.1}.\\
+Federico Fantechi, PhD · Department of Economics, Business and Statistics · University of Palermo · \texttt{federico.fantechi@unipa.it}\\
+Comments, bugs and suggestions are very welcome.\\
+For the method itself, see the GARF working paper; for the engine, \code{README.txt} in the package.
+\end{center}
+
+\end{document}
