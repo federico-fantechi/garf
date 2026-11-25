@@ -13,7 +13,8 @@ set more off
 * --- point Stata at the package -----------------------------------------
 global GARF_HOME "/path/to/GARF-binary"                 // <-- EDIT THIS
 adopath + "$GARF_HOME/integrations/stata"               // must end in /stata
-which garf                                              // should print the .ado path
+which garf                                              // should print the .ado path (version 1.2)
+which garfte
 
 * --- get some data ------------------------------------------------------
 * This example uses the synthetic demo panel. Generate it once by running the
@@ -42,7 +43,28 @@ return list
 *   garf_block   numeric id for cluster()
 *   post         1 if year >= 2000
 
-* --- estimate the matching DiD ------------------------------------------
+* --- estimation stage: garfte (new in 1.2) --------------------------------
+* garfte runs on the matched panel in memory and never changes it. Results:
+* a table by event time + overall ATT, an event-study graph, e(b)/e(V), and
+* files in garf_output/estimations/ (incl. the effect of EACH treated unit).
+* gap = treated minus its own weighted donors, in levels (replacement allowed):
+garfte, method(gap)
+ereturn list
+
+* The matching DiD needs a match WITHOUT replacement (garfte checks it).
+* garf replaced the data in memory, so reload the panel before matching again:
+import delimited "$GARF_HOME/demo/input/panel.csv", clear varnames(1) case(preserve)
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) ///
+      tvarying(x1 x2) tinvariant(region) noreplacement k(3)
+garfte, method(did)
+garfte, method(gap)                 // the bracketing estimate on the same match
+
+* Only 5 periods either side of T0, 90% intervals, no graph:
+*   garfte, method(did) pre(5) post(5) level(90) nograph
+* On a saved output folder (garf ..., store / noload store):
+*   garfte using "garf_output", method(gap)
+
+* --- or estimate the matching DiD yourself -------------------------------
 * With the standard treatment coding, W is the treated-times-post indicator,
 * so its coefficient (with unit + time FE, proximity-weighted) is the ATT.
 capture which reghdfe

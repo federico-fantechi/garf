@@ -8,7 +8,7 @@
 *  ---------------------------------------------------------------------------
 
 cd "$GARF_WORK"
-import delimited "garf_output/matches.csv", clear varnames(1)
+import delimited "$GARF_OUTDIR/matches.csv", clear varnames(1)
 
 * --- per treated unit ----------------------------------------------------------
 preserve

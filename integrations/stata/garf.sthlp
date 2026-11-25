@@ -1,9 +1,9 @@
 {smcl}
-{* garf.sthlp — help for the GARF (binary) Stata wrapper — version 1.1}{...}
+{* garf.sthlp — help for the GARF (binary) Stata wrapper — version 1.2}{...}
 {title:Title}
 
 {p 4 8}{bf:garf} {hline 2} Forest-proximity matching for panel counterfactuals (binary build){p_end}
-{p 4 8}{bf:version 1.1}{p_end}
+{p 4 8}{bf:version 1.2}{p_end}
 {p 4 8}Federico Fantechi, PhD {hline 1} University of Palermo {hline 1} federico.fantechi@unipa.it{p_end}
 
 
@@ -22,7 +22,11 @@ settings where common strategies based on linear models (e.g. propensity score m
 few treated units, panel data, many covariates, non-linear or threshold selection, selection on
 pre-treatment trajectories. With few covariates and simple, roughly linear selection, GARF will perform
 comparably to, or worse than, a well-specified propensity score.{p_end}
-{p 4 8}GARF does {bf:not} estimate the treatment effect itself {hline 1} that stays in your hands.{p_end}
+{p 4 8}{cmd:garf} builds the counterfactual; it does not estimate the treatment effect. The package's
+companion command {help garfte}, run after {cmd:garf}, is the estimation stage: a matching
+difference-in-differences ({cmd:method(did)}) or the treated-minus-own-donors gap ({cmd:method(gap)}),
+by event time and overall, with an event-study graph and the effect of each treated unit. You can
+equally take the matched panel to your own estimator.{p_end}
 {p 4 8}This Stata command is a front end: it calls the packaged Python engine through Stata's {cmd:shell}
 (Stata 14 or newer; Stata's own {cmd:python:} integration is {it:not} required). The forest and all
 computation run in Python, using the package's own environment.{p_end}
@@ -44,7 +48,10 @@ computation run in Python, using the package's own environment.{p_end}
 {synoptline}
 {syntab:Required}
 {synopt:{opt tre:atment(varname)}}binary treatment column; a unit is treated if it is ever 1 (standard coding: 1 for treated units in treated years, else 0){p_end}
-{synopt:{opt o:utcome(varname)}}outcome variable; enters the matching only through its pre-treatment window{p_end}
+{synopt:{opt o:utcome(varname)}}outcome variable. For the matching it is simply the first time-varying
+variable: it gets exactly the same pre-window features as those in {opt tvarying()}, and the forest is fit on
+the treatment, never on the outcome. Naming it serves reporting and later steps: {help garfte} estimates on it by
+default, and the diagnostics plot its path and placebo gap. No need to repeat it in {opt tvarying()}{p_end}
 {synopt:{opt id(varname)}}unit identifier (numeric or string){p_end}
 {synopt:{opt ti:me(varname)}}time variable{p_end}
 {synopt:{opt t0(#)}}treatment onset period (T0){p_end}
@@ -95,7 +102,8 @@ off, higher is stricter); COMBINES with k(){p_end}
 {cmd:garf} is a thin wrapper around the packaged Python engine {cmd:garf_binary.py}. It exports
 the current panel to a temporary CSV, writes a config from the options above, runs the engine,
 and reports a matching summary. It does {bf:not} estimate the treatment effect: it produces a
-matched donor panel that you feed to your own weighted DiD / event study.
+matched donor panel that you feed to {help garfte} or to your own weighted DiD / event study. The
+summary ends with a short {it:Next steps} note: how to run the diagnostics and {cmd:garfte}.
 
 {p 4 8}
 {bf:By default the matched panel is loaded into memory and no files are saved.} This is the
@@ -287,6 +295,9 @@ of its treated unit, then estimate the DiD within each group — no re-matching 
 {p 4 8}
 Each regression uses only the treated units in that group and their own matched controls. Watch
 the group sizes ({cmd:tab big if treated_grp==1}) — small groups give noisy estimates.{p_end}
+{p 4 8}{help garfte} also writes the estimated effect of {it:each} treated unit in each period
+({cmd:garfte_}{it:method}{cmd:_units.csv}), which can be related directly to characteristics of the
+treated units; see {help garfte##het:garfte, Heterogeneous effects}.{p_end}
 
 
 {title:What loading adds}
@@ -307,20 +318,28 @@ those carried straight through from the engine's {cmd:matched_panel.csv} ({cmd:p
 {p 8 10}{cmd:garf_unit}    numeric id of {cmd:unique_id} — use in {cmd:absorb()}{p_end}
 {p 8 10}{cmd:garf_block}   numeric id of {cmd:block_id} — use in {cmd:vce(cluster )}{p_end}
 {p 8 10}{cmd:post}         1 if {it:time} >= T0{p_end}
+{p 4 8}The panel is imported in double precision, and {cmd:garf} stores its settings on it as
+characteristics ({cmd:char list _dta[]}): {cmd:garf_version}, {cmd:garf_t0}, {cmd:garf_npre},
+{cmd:garf_includet0}, {cmd:garf_outcome}, {cmd:garf_treatment}, {cmd:garf_id}, {cmd:garf_time},
+{cmd:garf_replace}, {cmd:garf_k}, {cmd:garf_wpower}, {cmd:garf_outdir}, and the whole design for the
+diagnostics: {cmd:garf_tvarying}, {cmd:garf_tinvariant}, {cmd:garf_call}, {cmd:garf_design},
+{cmd:garf_forest}, {cmd:garf_tune}, {cmd:garf_if}, {cmd:garf_in}, {cmd:garf_source} (the .dta the data were
+loaded from), {cmd:garf_source_changed}, {cmd:garf_nobs} (rows garf ran on). {help garfte} and the do-files in
+{cmd:DIAGNOSTICS} read them; they are kept if you {cmd:save} the panel and {cmd:use} it later.{p_end}
 
 
 {title:Setup (once)}
 
 {phang2}{cmd:. global GARF_HOME "/path/to/GARF-binary"}{p_end}
-{p 4 8}Put {cmd:garf.ado} and {cmd:garf.sthlp} on the ado-path — note the {bf:/stata} folder:{p_end}
+{p 4 8}Put {cmd:garf.ado}, {cmd:garf.sthlp}, {cmd:garfte.ado} and {cmd:garfte.sthlp} on the ado-path — note the {bf:/stata} folder:{p_end}
 {phang2}{cmd:. adopath + "$GARF_HOME/integrations/stata"}{p_end}
 {p 4 8}To make it permanent, put the {cmd:global} line in your {cmd:profile.do} and either the
-{cmd:adopath} line too, or copy {cmd:garf.ado} and {cmd:garf.sthlp} into your PERSONAL folder
+{cmd:adopath} line too, or copy the four files into your PERSONAL folder
 (see {cmd:sysdir}). Keep the package folder itself in a fixed place: {cmd:garf} finds the engine
 through {cmd:$GARF_HOME}.{p_end}
 {p 4 8}{bf:Check the version.} Stata looks for {cmd:garf.ado} in the {it:current} folder before the
 ado-path, so an old copy left in your working folder silently takes precedence. {cmd:which garf}
-must report {bf:version 1.1}; after replacing the files, type {cmd:discard} (or restart Stata) so that
+and {cmd:which garfte} must report {bf:version 1.2}; after replacing the files, type {cmd:discard} (or restart Stata) so that
 a version already loaded in memory is dropped.{p_end}
 
 
@@ -333,12 +352,20 @@ component, variance ratios, balance over time, the pre-treatment outcome path, a
 placebo, effective sample size and donor reuse, overlap, Forest Match Quality by block, forest
 fit and feature importance, a sensitivity grid over {opt k()}, {opt caliper()}, {opt wpower()},
 {opt noreplacement} and {opt seed()}, and the FMQ-ESS frontier. All of them use pre-treatment
-information only. On the demonstration panel, from a project folder:{p_end}
+information only. They run {bf:after your own garf, with nothing to edit}: {cmd:garf} stores its whole
+design on the matched panel, and the do-files read it from there. From your project folder, with the
+matched panel in memory (or after {cmd:use garf_matched.dta}):{p_end}
+{phang2}{cmd:. garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2) store}{p_end}
 {phang2}{cmd:. do "$GARF_HOME/DIAGNOSTICS/00_master.do"}{p_end}
-{p 4 8}Outputs (tables in the log, five figures as PDF) go to {cmd:./garf_diagnostics}. For your own
-data, copy the folder, edit only {cmd:00_settings.do}, set {cmd:global GARF_DIAG} to the copy and run
-its {cmd:00_master.do}. The widest design of the sensitivity grid is set by {cmd:KWIDE} in
-{cmd:00_settings.do}, default {cmd:k(1000)}: on large donor pools the uncapped forest kernel ({opt nokcap}) can
+{p 4 8}Outputs (tables in the log, five figures as PDF) go to {cmd:./garf_diagnostics}; at the end the
+matched panel is back in memory. garf records the .dta the data were loaded from, and the do-files
+check that it still holds garf's variables and rows; if the data were imported from CSV, or variables
+were created or rows dropped after loading, save that panel and set {cmd:global GARF_DATA "}{it:path}{cmd:"} first. With
+{opt store} the do-files read garf's files directly; without it they rerun the design once, with the
+same seed. The sensitivity grid (20 garf runs) is skipped on pools of 20,000 units or more unless
+{cmd:global GARF_GRID on}. With no matched panel in memory the same command runs the demonstration
+panel (the manual settings of {cmd:00_settings.do}). The widest design of the sensitivity grid is set
+by {cmd:global KWIDE}, default {cmd:k(1000)}: on large donor pools the uncapped forest kernel ({opt nokcap}) can
 give thousands of donors per treated unit and a matched panel of tens of millions of rows; set
 {cmd:global KWIDE "nokcap"} for small pools. See {cmd:DIAGNOSTICS/README.txt}.{p_end}
 
@@ -376,6 +403,7 @@ https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestC
 {pstd}Default (k-NN) — run, load the matched panel into memory, save nothing:{p_end}
 {phang2}{cmd:. preserve}{p_end}
 {phang2}{cmd:. garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2) tinvariant(region)}{p_end}
+{phang2}{cmd:. garfte, method(gap)}{p_end}
 {phang2}{cmd:. reghdfe Y W [pw=weight], absorb(garf_unit year) vce(cluster garf_block)}{p_end}
 
 {pstd}Caliper selection (all controls within a proximity of each treated; caliper is on the
@@ -411,17 +439,23 @@ Units without a complete pre-window are dropped by the engine (with a note).{p_e
 {title:Author and feedback}
 
 {p 4 8}
-This is {bf:version 1.1}, the first public release.{p_end}
+This is {bf:version 1.2}. Version 1.1 was the first public release; 1.2 adds the estimation stage
+{help garfte}.{p_end}
 
 {p 4 8}Special thanks for sparking the need for this package, and for all the time spent trying to
 understand and debug what I was building, go to my friend and colleague{p_end}
 {p 4 8}dott. Giulio Breglia, from GSSI - Gran Sasso Science Institute.{p_end}
 
 {p 4 8}
-Comments, bugs and suggestions are very welcome:{p_end}
+Comments, bug reports and suggestions are very welcome:{p_end}
 {p 4 8}
 Federico Fantechi, PhD{p_end}
 {p 4 8}
 Department of Economics, Business and Statistics — University of Palermo{p_end}
 {p 4 8}
 {cmd:federico.fantechi@unipa.it}{p_end}
+{p 4 8}Reference: Fantechi, F. (2026). Matching Histories, not Just Averages: GARF, Group-Aware Random Forest for Counterfactuals Identification in Panel Data. SSRN Working Paper. doi:10.2139/ssrn.7719438{p_end}
+
+{title:Also see}
+
+{p 4 8}{help garfte} {hline 1} the estimation stage (matching DiD and gap){p_end}

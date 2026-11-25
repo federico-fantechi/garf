@@ -1,19 +1,23 @@
 # GARF: Group-Aware Random Forest matching for panel counterfactuals
 
 
-[![DOI](https://zenodo.org/badge/1461156657.svg)](https://doi.org/10.5281/zenodo.24303485)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24303486.svg)](https://doi.org/10.5281/zenodo.24303486)
 
 GARF builds the comparison group for a policy evaluation with panel data. It
 encodes each unit's pre-treatment history as levels and trajectory descriptors,
 trains a random forest on treatment, and matches every treated unit to untreated
 donors on the forest's leaf proximity. It returns a matched panel and a set of
-pre-treatment diagnostics. It does **not** estimate the treatment effect: the
-matched panel is the input to your own difference-in-differences or event study.
+pre-treatment diagnostics.vThe effect is estimated in a separate step: the
+companion command `garfte` (new in 1.2) gives a matching difference-in-differences
+or the treated-minus-own-donors gap, by event time and overall, with an
+event-study graph and the effect of each treated unit; or take the matched panel
+to your own estimator.
 
-This repository contains the Python engine, the Stata command `garf`, the user
-guide and the do-files for the design-stage diagnostics.
+This repository contains the Python engines (matching and estimation), the
+Stata commands `garf` and `garfte`, the user guide and the do-files for the
+design-stage diagnostics.
 
-**Status:** version 1.1, the first public release. Binary, absorbing treatment with a single onset date.
+**Status:** version 1.2 (adds the estimation stage `garfte`; version 1.1 was the first public release). Binary, absorbing treatment with a single onset date.
 
 ## Requirements
 
@@ -24,7 +28,7 @@ guide and the do-files for the design-stage diagnostics.
 
 ## Install
 
-Download the [latest release](https://github.com/federico-fantechi/garf/releases/latest)
+Download the [latest release](https://github.com/GITHUB_USER/garf/releases/latest)
 (or clone the repository), then run the setup once from the package folder:
 
 ```
@@ -38,7 +42,9 @@ In Stata, point to the package and add the command to the ado-path:
 global GARF_HOME "/path/to/GARF-binary"
 adopath + "$GARF_HOME/integrations/stata"
 which garf
+which garfte
 help garf
+help garfte
 ```
 
 Put the two lines in your `profile.do` to make them permanent. See
@@ -53,6 +59,17 @@ save raw.dta, replace
 garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) ///
       tvarying(x1 x2) tinvariant(region) store
 return list
+
+garfte, method(gap)                   // treated minus its own donors, in levels
+```
+
+The matching difference-in-differences needs a match without replacement:
+
+```stata
+use raw.dta, clear
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) ///
+      tvarying(x1 x2) tinvariant(region) noreplacement k(3)
+garfte, method(did)
 ```
 
 `garf` replaces the data in memory with the matched panel, so save or
@@ -66,11 +83,12 @@ cd demo && ./run_demo.sh
 
 | Folder | Content |
 |---|---|
-| `engine/` | `garf_binary.py`, the engine (one file), with a config template and run scripts |
-| `integrations/stata/` | `garf.ado`, `garf.sthlp`, an example do-file, the guide source |
+| `engine/` | `garf_binary.py`, the matching engine, and `garf_estimate.py`, the estimation stage, with a config template and run scripts |
+| `integrations/stata/` | `garf.ado`, `garfte.ado` and their help files, an example do-file, the guide source |
 | `DIAGNOSTICS/` | one do-file per design-stage diagnostic; `00_master.do` runs them all |
 | `demo/` | a small synthetic panel and its generator, to check the installation |
-| `GARF_Stata_Guide_v1.1.pdf` | the user guide |
+| `GARF_Stata_Guide_v1.2.pdf` | the user guide |
+| `GARF_Reading_Guide_v1.2.pdf` | reading the output: every number, table and figure of `garf`, the diagnostics and `garfte`, and how to interpret it |
 
 `README.txt` documents the engine and its configuration file in full;
 `CHANGELOG.md` lists the changes by version.
@@ -80,10 +98,10 @@ cd demo && ./run_demo.sh
 If you use GARF, please cite the paper and the software:
 
 > Fantechi, F. (2026). *Matching Histories, not Just Averages: GARF, Group-Aware Random Forest for Counterfactuals Identification in Panel Data*. Working paper, University of Palermo.
-> arXiv:XXXX.XXXXX.
+> https://dx.doi.org/10.2139/ssrn.7719438.
 
 > Fantechi, F. (2026). *GARF: Group-Aware Random Forest matching for panel
-> counterfactuals* (version 1.1). Zenodo. https://doi.org/10.5281/zenodo.24303486
+> counterfactuals* (version 1.2). Zenodo. https://doi.org/10.5281/zenodo.24303486
 
 GitHub's "Cite this repository" button gives the same in BibTeX.
 

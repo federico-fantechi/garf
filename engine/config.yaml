@@ -8,7 +8,7 @@ data_path: input/panel.csv   # put your panel CSV in the 'input' folder
 id_col: id                   # unit identifier column
 year_col: year               # time column
 treat_col: W                 # binary treatment column (0/1)
-outcome_col: Y               # outcome column
+outcome_col: Y               # outcome: matched like any time-varying X (named for reporting)
 x_time_varying: [x1, x2]     # covariates that change over time (get lags + trajectory features)
 x_time_invariant: [region]   # covariates that don't change (strings are fine, no encoding needed)
 

@@ -9,9 +9,10 @@
 
 cd "$GARF_WORK"
 local X  "$Y $XTV"
+local X : list uniq X                    // the outcome may also be among the covariates
 local nv : word count `X'
-local lo = $T0 - $L                      // first period of the window
-local hi = $T0 - 1                       // last period of the window
+local lo = $WFIRST                       // first period of the window
+local hi = $WLAST                        // last period of the window
 
 tempname R
 matrix `R' = J(`nv', 2, .)

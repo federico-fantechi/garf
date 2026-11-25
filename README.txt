@@ -1,6 +1,6 @@
 =======================================================================
 GARF (binary) — forest-proximity matching for panel counterfactuals
-version 1.1
+version 1.2
 Federico Fantechi, PhD — University of Palermo — federico.fantechi@unipa.it
 =======================================================================
 
@@ -10,10 +10,12 @@ A simplified, binary-only build of GARF, packaged so a colleague can test it
 in a few minutes. You give it a panel; it fits a random forest on the binary
 treatment, turns the forest into a proximity kernel, and returns a MATCHED
 PANEL (each treated unit paired with its k nearest control "donors"), plus
-balance diagnostics. It does NOT estimate the treatment effect — you run your
-own DiD / event study on the matched panel it produces. Keeping the outcome out
-of the tool is deliberate: nothing here can be tuned on the effect you are
-trying to measure.
+balance diagnostics. The matching engine does NOT estimate the treatment
+effect. Keeping the outcome effect out of the matching is deliberate: nothing in
+the design can be tuned on the effect you are trying to measure. The effect is
+estimated in a SEPARATE step, after the design is fixed: the estimation engine
+garf_estimate.py (new in 1.2; section 9), or your own DiD / event study on the
+matched panel.
 
 
 -----------------------------------------------------------------------
@@ -26,7 +28,8 @@ trying to measure.
   setup.sh / setup.bat   optional one-time environment setup
 
   engine/             THE TOOL — run it on your own data
-    garf_binary.py      the engine (one file)
+    garf_binary.py      the matching engine (one file)
+    garf_estimate.py    the estimation stage (did | gap), run after matching
     config.yaml         the only thing you edit
     run.sh / run.bat    run on your data
     input/              <-- put your panel CSV here (default: input/panel.csv)
@@ -257,12 +260,50 @@ bar over the proximity computation (the heaviest step).
 The engine can be driven from Stata or R without losing any features — they act
 as front-ends while Python stays the compute engine.
 
-  integrations/stata/   garf.ado + help + example.do + README_stata.txt
-                        (a native 'garf' command; run setup once, then call it)
+  integrations/stata/   garf.ado, garfte.ado + help + example.do + README_stata.txt
+                        (native 'garf' and 'garfte' commands; run setup once,
+                        then call them)
   DIAGNOSTICS/          the design-stage diagnostic protocol, as do-files that
                         call garf (see DIAGNOSTICS/README.txt)
 
 An R wrapper (reticulate + shell fallback) can be added the same way.
+
+
+-----------------------------------------------------------------------
+9. THE ESTIMATION STAGE  (engine/garf_estimate.py, new in 1.2)
+-----------------------------------------------------------------------
+A separate file: the matching engine never calls it. It reads a matched panel
+and estimates the effect on the treated, by event time e = t - T0 and overall.
+From a terminal, on an output folder of the matching engine:
+
+  python garf_estimate.py --from output --method did
+  python garf_estimate.py --from output --method gap --pre 5 --post 5
+
+  (use the package's .venv Python: ../.venv/bin/python, or ..\.venv\Scripts\python.exe)
+
+Both methods start from the gap of each treated unit to its own counterfactual,
+  G(i,t) = Y(i,t) - sum_j w(i,j) Y(j,t)
+(weights renormalised over the donors observed in t when some are missing).
+
+  --method did   matching difference-in-differences: G measured from its mean
+                 over the matching window. Parallel trends conditional on the
+                 match. Needs a match WITHOUT replacement (with_replacement:
+                 false); stops otherwise. SEs clustered by block.
+  --method gap   G itself, in levels. Unconfoundedness given the matched
+                 history. Replacement allowed; SEs clustered by block plus a
+                 correction for donors shared between blocks.
+
+ATT(e) = mean over treated units; ATT = equal-weight average of the post ATT(e).
+Student-t intervals with (treated units - 1) df; warning below 30 treated units.
+Options: --outcome NAME (another column of matched_panel.csv), --pre N, --post N,
+--level 95, --outdir DIR (default: <from>/estimations). Other input: --panel CSV
+with --t0 --npre --includet0 --id --time --matched-outcome (this is how the
+Stata command garfte calls it).
+
+Outputs (garfte_<method>_ prefix): event.csv, units.csv (effect of each treated
+unit in each period), vcov.csv, summary.csv, messages.txt; error.txt if it
+stopped. Full description: the docstring at the top of garf_estimate.py and
+'help garfte' in Stata.
 
 
 Simplified binary build. For the full version (continuous-dose fitting, honest

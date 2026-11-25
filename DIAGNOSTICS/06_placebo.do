@@ -1,6 +1,8 @@
 *! 06_placebo.do  --  out-of-window placebo (paper: 5.6, Figure 4)
 *  ---------------------------------------------------------------------------
-*  The design is backdated by H periods and run on pre-treatment data only:
+*  The design checked (your garf design, or $GARF_DESIGN) is backdated by H
+*  periods (default 3; lowered automatically if the data do not reach back far
+*  enough for a full window) and run on pre-treatment data only:
 *    pseudo-onset  T0p = T0 - H
 *    matching window  T0p-L ... T0p-1
 *    pseudo-post      T0p   ... T0-1   (true effect = 0)
@@ -11,9 +13,21 @@
 *  ---------------------------------------------------------------------------
 
 cd "$GARF_WORK"
-local T0p = $T0 - $H
-
 use raw.dta, clear
+
+* --- how far back: the backdated window must fit in the data -----------------
+quietly summarize $T if !missing($Y)
+local Hmax = $T0 - $L + $INCT0 - r(min)  // largest backdating with a full window
+local H = min($H, `Hmax')
+if `H' < 1 + $INCT0 {
+    di as txt "[06_placebo] skipped: the data start in " r(min) ", too late for a full matching"
+    di as txt "             window before a backdated onset (needs " $L " periods before " ///
+        $T0 - 1 - $INCT0 ")."
+    exit
+}
+if `H' < $H di as txt "[06_placebo] backdating H lowered from $H to `H': the data start in " r(min) "."
+local T0p = $T0 - `H'
+
 * In the pre-treatment sample the treatment variable is 0 everywhere, so the
 * ever-treated indicator defines who is treated.
 bysort $ID: egen byte _everT = max($W)
@@ -32,7 +46,7 @@ restore
 * --- backdated design (default k, no files kept) ------------------------------
 local call : subinstr global GARF_CALL "treatment($W)" "treatment(_everT)"
 local call : subinstr local call "t0($T0)" "t0(`T0p')"
-garf if $T < $T0, `call' k($K)
+garf if $T < $T0, `call' $GARF_DESIGN $GARF_FOREST    // your design, backdated
 
 collapse (mean) $Y [aw=weight], by($T treated_grp)
 reshape wide $Y, i($T) j(treated_grp)
@@ -41,10 +55,10 @@ merge 1:1 $T using `r', nogen
 list $T gap_garf gap_raw, noobs
 
 * --- figure ----------------------------------------------------------------
-local wstart = `T0p' - $L - 0.5          // start of the matching window
-local pstart = `T0p' - 0.5               // start of the pseudo-post window
-local xw = `T0p' - $L/2 - 0.5
-local xp = (`T0p' + $T0 - 1)/2
+local wstart = `T0p' - $L + $INCT0 - 0.5 // start of the matching window
+local pstart = `T0p' + $INCT0 - 0.5      // start of the pseudo-post window
+local xw = (`wstart' + `pstart')/2
+local xp = (`pstart' + $T0 - 0.5)/2
 quietly summarize gap_raw
 local ymax = max(r(max), 0)
 local ymin = min(r(min), 0)

@@ -21,12 +21,12 @@ bysort $ID: egen byte treated_grp = max($W)
 collapse (mean) $Y, by($T treated_grp)
 gen sample = "raw"
 append using `m'
-keep if $T < $T0                         // post-treatment belongs to the analysis
+keep if $T <= $WLAST                     // post-treatment belongs to the analysis
 
 list $T $Y treated_grp sample, sepby(sample) noobs
 
-local wstart = $T0 - $L - 0.5
-local xtxt   = $T0 - $L/2 - 0.5
+local wstart = $WFIRST - 0.5
+local xtxt   = ($WFIRST + $WLAST)/2
 quietly summarize $Y
 local ytxt = r(max) + 0.05*(r(max) - r(min))
 

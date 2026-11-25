@@ -4,6 +4,91 @@ Newest first. Version 1.1 is the first public release; the "beta" entries below
 are the development builds that preceded it and keep their original numbering
 (the development build "beta 1.1" is not version 1.1).
 
+## 1.2 (2026-11-19), the estimation stage
+
+NEW: the estimation stage, a separate step after matching.
+
+  * Stata command `garfte` (garfte.ado, garfte.sthlp) and Python file
+    `engine/garf_estimate.py`. `garfte` runs on the matched panel `garf` left in
+    memory, or with `using` on a saved garf output folder; the data in memory
+    are never changed. From a terminal:
+    `python garf_estimate.py --from output --method did|gap`.
+  * Two methods, no default. Both start from the gap of each treated unit to
+    its own weighted donors, G(i,t) = Y(i,t) - sum_j w(i,j) Y(j,t).
+    `method(did)`: matching difference-in-differences, G measured from its mean
+    over the matching window; needs a panel matched without replacement
+    (checked: stops if a donor serves more than one treated unit); standard
+    errors clustered by block. `method(gap)`: G in levels; replacement allowed;
+    block-clustered standard errors plus a correction for donors shared between
+    blocks.
+  * ATT(e) by event time and the overall ATT (equal-weight average of the
+    post-treatment ATT(e)); Student-t intervals with (treated units - 1) df and
+    a warning below 30 treated units; window periods labelled (not a
+    pre-trends test). Weights are renormalised over the donors observed when
+    some donor-periods are missing.
+  * Output: table, event-study graph (.gph/.pdf; ATT(e) as a line with a
+    level()% confidence band, synthetic-control style, matching window
+    shaded, overall ATT in the subtitle, legend below; colours from the current
+    scheme, band and window transparent in Stata 15+), e(b)/e(V) (coefplot, test),
+    and garfte_<method>_{event,units,vcov,summary}.csv in
+    garf_output/estimations/; the units file holds the effect of each treated
+    unit in each period.
+  * Options: outcome() pre() post() level() nograph outdir() enginedir() python();
+    level() defaults to 95 (not affected by set level).
+  * Checks: the panel must be a complete garf matched panel (donor weights of
+    every block sum to 1; otherwise "matched panel was modified").
+  * Checked on the demonstration panel: point estimates equal those of the
+    stacked weighted regression with block-by-period fixed effects (to 1e-14),
+    standard errors equal its cluster-robust ones with the G/(G-1) factor. In
+    simulations, 95% intervals cover at 93-97% (gap with heavy donor reuse:
+    about 90% without the reuse correction, about 95% with it).
+
+Changes to `garf` (the matching computations are unchanged):
+
+  * It stores its settings on the loaded matched panel as characteristics
+    `_dta[garf_*]` (T0, window, includet0, outcome, treatment, id, time,
+    replacement, k, wpower, output folder), read by `garfte`.
+  * FIXED: the matched panel is imported with `asdouble`. Before, decimals
+    were stored as float (about 7 significant digits), which rounded large
+    outcomes (e.g. GDP in euros) and the weights.
+  * The output ends with a short "Next steps" note: save the matched panel,
+    edit DIAGNOSTICS/00_settings.do and run the diagnostics, run `garfte`. The
+    reghdfe example line after the variable list is gone (the quick DiD stays
+    documented in help garf).
+  * Cleaner log: engine warnings print as one "[GARF] warning: ..." line
+    (no file path or echoed source line); no "(note: file ... not found)"
+    when garf writes its temporary config.
+  * Engine: `__version__` = 1.2 (no change to the matching).
+  * The characteristics also record the whole design (garf_call, garf_design,
+    garf_forest, garf_tune, garf_tvarying, garf_tinvariant, garf_if, garf_in)
+    and the file the data were loaded from (garf_source; also with unsaved
+    changes such as sort/xtset), plus garf_nobs, for the diagnostics.
+    01_first_run.do checks that file for garf's variables and row count.
+
+DIAGNOSTICS: run right after your own garf, nothing to edit.
+
+  * 00_settings.do reads every setting from the garf matched panel in memory
+    (or a saved one); the manual block (demo panel) is used only when there
+    is none. The settings stay in force for the session.
+  * 01_first_run.do takes garf's sample (if/in) and files; without store it
+    reruns the design once, same seed, to recreate them.
+  * 06_placebo.do backdates the design actually used, and lowers H (or
+    skips) when the data do not reach back far enough for a full window.
+  * 11-12: the sensitivity grid adds your design ("your design" in the
+    frontier) and uses your forest options; skipped by 00_master.do on pools
+    of 20,000+ units unless global GARF_GRID on.
+  * 04: no more overflow with long variable names; 03-04: the outcome may
+    also be among the covariates; 03-06 use the actual window (includet0).
+  * 10 prints the out-of-bag fit statistics from diagnostics.json.
+  * 00_master.do returns to your folder with the matched panel in memory.
+
+New document: GARF_Reading_Guide_v1.2.pdf (source:
+integrations/stata/GARF_Reading_Guide.tex), how to read every output of garf,
+the diagnostics and garfte.
+
+garfte output: notes wrapped to the log width; for method(gap), the mean
+window gap is printed next to the overall ATT; no extra blank lines.
+
 ## 1.1 (2026-11-17), first public release
 
 Same computations and results as development build beta 1.5. Changes to the

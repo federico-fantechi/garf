@@ -10,7 +10,7 @@
 *  ---------------------------------------------------------------------------
 
 cd "$GARF_WORK"
-import delimited "garf_output/blocks.csv", clear varnames(1)
+import delimited "$GARF_OUTDIR/blocks.csv", clear varnames(1)
 
 tabstat best_proximity_minmax overlap_mass, stats(mean p10 p50 p90 min max) format(%5.3f)
 

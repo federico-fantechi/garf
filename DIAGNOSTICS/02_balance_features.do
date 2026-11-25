@@ -6,7 +6,7 @@
 *  ---------------------------------------------------------------------------
 
 cd "$GARF_WORK"
-import delimited "garf_output/balance.csv", clear varnames(1)
+import delimited "$GARF_OUTDIR/balance.csv", clear varnames(1)
 
 * feature names are  variable__component  (e.g. Y__slope, x1__L3)
 gen variable  = cond(strpos(feature,"__")>0, substr(feature,1,strpos(feature,"__")-1), feature)
@@ -27,6 +27,6 @@ label values dynamic dyn
 list, sepby(variable) noobs
 
 * full feature-by-feature table, worst matched imbalance first:
-* import delimited "garf_output/balance.csv", clear varnames(1)
+* import delimited "$GARF_OUTDIR/balance.csv", clear varnames(1)
 * gsort -abs_matched
 * list feature abs_raw abs_matched, noobs

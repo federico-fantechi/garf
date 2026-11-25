@@ -1,7 +1,8 @@
 """
 GARF (binary) — forest-proximity matching for panel counterfactuals.
 ====================================================================
-Version: 1.1 (first public release; identical to development build beta 1.5).
+Version: 1.2 (package version; the matching is identical to 1.1 and to development
+build beta 1.5. 1.2 adds the separate estimation stage garf_estimate.py).
 
 beta 1.5 changes:
   * CHANGED: Forest Match Quality is now normalised by the best match ATTAINABLE
@@ -151,7 +152,7 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold
 
-__version__ = "1.1"
+__version__ = "1.2"
 
 
 # =============================================================================
@@ -438,7 +439,7 @@ def build_features(df: pd.DataFrame, cfg: GarfConfig):
 
     if dropped:
         warnings.warn(
-            f"{len(dropped)} units dropped: incomplete pre-window "
+            f"{len(dropped)} unit(s) dropped: incomplete pre-window "
             f"[{first}-{last}] on outcome/time-varying X."
         )
 
@@ -451,7 +452,7 @@ def build_features(df: pd.DataFrame, cfg: GarfConfig):
     X = X.astype(float)
     if X.isna().any().any():
         n_bad = int(X.isna().any(axis=1).sum())
-        warnings.warn(f"{n_bad} units have NaN features; median-imputing.")
+        warnings.warn(f"{n_bad} unit(s) have missing features; filled with the median.")
         X = X.fillna(X.median())
 
     return X, meta
@@ -989,7 +990,7 @@ data_path: input/panel.csv   # put your panel CSV in the 'input' folder
 id_col: id                   # unit identifier column
 year_col: year               # time column
 treat_col: W                 # binary treatment column (0/1)
-outcome_col: Y               # outcome column
+outcome_col: Y               # outcome: matched like any time-varying X (named for reporting)
 x_time_varying: [x1, x2]     # covariates that change over time (get lags + trajectory features)
 x_time_invariant: [region]   # covariates that don't change (strings are fine, no encoding needed)
 
@@ -1038,6 +1039,8 @@ def main():
         return
     if not a.config:
         ap.error("give --config config.yaml (or --init to create one)")
+    # one clean line per warning (no file path, no echoed source line)
+    warnings.formatwarning = lambda msg, *args, **kw: f"[GARF] warning: {msg}\n"
     run(GarfConfig.from_yaml(a.config))
 
 

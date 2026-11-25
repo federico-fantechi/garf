@@ -10,7 +10,8 @@ drives the same Python code — so nothing is lost.
 How it works: garf exports the panel in memory to a temporary CSV, writes a
 config from your options, shells out to the Python engine, then reports a clean
 matching summary. BY DEFAULT it loads the matched panel into memory (and saves
-no files); you run your own weighted DiD on that matched panel.
+no files). Then estimate the effect with the companion command garfte (new in
+1.2; matching DiD or gap, see below), or with your own weighted DiD.
 
 
 -----------------------------------------------------------------------
@@ -35,19 +36,70 @@ INSTALL (once)
        global GARF_HOME "/path/to/GARF-binary"
        adopath + "$GARF_HOME/integrations/stata"
        which garf        // should print the path to garf.ado
+       which garfte      // and to garfte.ado
 
-   To make it permanent, copy garf.ado and garf.sthlp into your PERSONAL
+   To make it permanent, copy garf.ado, garf.sthlp, garfte.ado and
+   garfte.sthlp into your PERSONAL
    ado folder (type  sysdir  to find it) and put the 'global GARF_HOME ...'
    line in your profile.do. Keep the GARF-binary folder itself in a fixed
    place: garf finds the engine through GARF_HOME.
 
    CHECK THE VERSION: Stata uses a garf.ado in the CURRENT folder before the
    ado-path, so an old copy left in a working folder silently wins.
-       which garf        // first line must read: version 1.1
+       which garf        // first line must read: version 1.2
+       which garfte      // first line must read: version 1.2
        discard           // after replacing the files, drop the old program
 
 3) Check the help:
        help garf
+       help garfte
+
+
+-----------------------------------------------------------------------
+NEW IN 1.2: THE ESTIMATION STAGE, garfte
+-----------------------------------------------------------------------
+garfte runs AFTER garf, on the matched panel garf left in memory (or, with
+using, on a saved garf output folder). It never changes the data in memory.
+
+    garfte, method(did)    matching difference-in-differences: each treated
+                           unit's gap to its own weighted donors, measured from
+                           its mean over the matching window. Parallel trends
+                           conditional on the match. NEEDS a panel matched
+                           WITHOUT replacement (garf ..., noreplacement k(#)):
+                           garfte checks it and stops otherwise. SEs clustered
+                           by block (treated unit).
+    garfte, method(gap)    the gap itself, in levels: treated unit minus its own
+                           weighted donors. Unconfoundedness given the matched
+                           history. Replacement allowed; SEs clustered by block
+                           plus a correction for donors shared between blocks.
+    Report both: under fairly general conditions they bracket the effect.
+
+Output: a table of ATT(e) by event time and the overall ATT (equal-weight
+average of the post-treatment ATT(e)), an event-study graph, e(b)/e(V), and the
+files garfte_<method>_{event,units,vcov,summary}.csv (+ .gph/.pdf) in
+garf_output/estimations/. The units file has the effect of EACH treated unit in
+each period, for heterogeneity analysis.
+Options: outcome() pre(#) post(#) level(#) nograph outdir() enginedir() python()
+  level(#): confidence level for the table, the graph's band and the files;
+  default 95. The graph draws ATT(e) as a line with a confidence band
+  (synthetic-control style), the matching window shaded, legend below.
+  Colours follow the current scheme (set scheme); in Stata 15+ the band and
+  the window are transparent (Stata 14: fixed light colours).
+Window estimates are NOT a pre-trends test (see help garfte).
+
+DIAGNOSTICS (1.2): run them right after your own garf, nothing to edit:
+    garf, ... store
+    do "$GARF_HOME/DIAGNOSTICS/00_master.do"
+  garf stores its whole design on the matched panel; the do-files read it.
+  garf records the .dta the data were loaded from; if the data were imported
+  from CSV, or variables were created / rows dropped after loading, save
+  that panel and first set  global GARF_DATA "/path/to/panel.dta". The sensitivity grid is skipped
+  on pools of 20,000+ units unless  global GARF_GRID on.
+
+garf itself computes exactly as in 1.1. Three small changes: it stores its
+settings on the loaded panel as characteristics _dta[garf_*] (read by garfte),
+imports the matched panel in double precision (asdouble), and ends its output
+with a short "Next steps" note on diagnostics and estimation.
 
 
 -----------------------------------------------------------------------
@@ -133,6 +185,13 @@ Default (load matched panel into memory, save nothing):
     preserve
     garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) ///
           tvarying(x1 x2) tinvariant(region)
+    garfte, method(gap)                 // estimation stage (help garfte)
+
+Matching DiD (needs a match without replacement):
+    garf, ... noreplacement k(3)
+    garfte, method(did)
+
+Your own regression instead (quick DiD with common time effects):
     reghdfe Y W [pw=weight], absorb(garf_unit year) vce(cluster garf_block)
 
 Also save the CSV files:
@@ -184,11 +243,17 @@ STORED RESULTS r()
     r(oob_bacc) r(oob_auc) r(oob_score) r(wpower) r(cv_score, if tuned)
     r(outdir) r(matched_panel)     (only when files are saved)
 
+garfte (e-class): e(b) e(V) e(event) e(att) e(se_att) e(lb_att) e(ub_att)
+    e(p_att) e(N_treated) e(N_donors) e(donors_reused) e(mean_window_gap) ...
+
 
 -----------------------------------------------------------------------
 OUTPUT FILES (only when store / export / outdir is used)
 -----------------------------------------------------------------------
     matched_panel.csv  matches.csv  balance.csv  blocks.csv  diagnostics.json  features.csv
+garfte writes to garf_output/estimations/ (or outdir()):
+    garfte_<method>_event.csv  _units.csv  _vcov.csv  _summary.csv  _messages.txt
+    garfte_<method>.gph / .pdf
 
 
 -----------------------------------------------------------------------
@@ -239,6 +304,16 @@ lost my data after running garf    -> the default loads the matched panel and
                                       use noload to keep your data untouched.
 progress bar looks messy in log    -> it's off by default here; 'verbose' turns
                                       the engine's own progress back on.
+garfte: "no GARF matched panel in memory"
+                                   -> run garf (1.2+) first, or use
+                                      garfte using "garf_output", method(...)
+garfte: "matched panel was modified"
+                                   -> donors were dropped from the matched panel;
+                                      rerun garf (dropping whole blocks or whole
+                                      periods is fine).
+garfte: "method(did) needs a panel matched WITHOUT replacement"
+                                   -> garf ..., noreplacement k(#) with a k the
+                                      donor pool can supply; or method(gap).
 
 Notes:
 - The treatment column must be 1 for a treated unit in its treated years, 0

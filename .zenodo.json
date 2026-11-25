@@ -1,15 +1,19 @@
 {
   "title": "GARF: Group-Aware Random Forest matching for panel counterfactuals (Stata command and Python engine)",
   "upload_type": "software",
-  "description": "<p>GARF builds comparison groups for policy evaluation with panel data. Each unit's pre-treatment history is encoded as levels and trajectory descriptors, a random forest is trained on treatment, and treated units are matched to untreated donors on the forest's leaf proximity. The package contains the Python engine, the Stata command <code>garf</code>, a user guide and do-files for the design-stage diagnostics. It returns a matched panel and pre-treatment diagnostics; it does not estimate the treatment effect.</p>",
+  "description": "<p>GARF builds comparison groups for policy evaluation with panel data. Each unit's pre-treatment history is encoded as levels and trajectory descriptors, a random forest is trained on treatment, and treated units are matched to untreated donors on the forest's leaf proximity. The package contains the Python engine, the Stata command <code>garf</code>, a user guide and do-files for the design-stage diagnostics. It returns a matched panel and pre-treatment diagnostics.</p>",
   "creators": [
     {
       "name": "Fantechi, Federico",
-      "affiliation": "Department of Economics, Business and Statistics, University of Palermo",
-      "orcid": "https://orcid.org/0000-0001-5323-0596"
+      "affiliation": "Department of Economics, Business and Statistics, University of Palermo"
     }
   ],
   "license": "MIT",
   "access_right": "open",
+  "version": "1.2",
   "keywords": ["matching", "random forest", "panel data", "causal inference", "policy evaluation", "Stata", "Python"]
 }
+
+"related_identifiers": [
+  {"identifier": "10.2139/ssrn.7719438", "relation": "isSupplementTo", "scheme": "doi"}
+],

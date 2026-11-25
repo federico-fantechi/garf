@@ -1,0 +1,433 @@
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper,top=2.1cm,bottom=2.1cm,left=2.2cm,right=2.2cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,array,tabularx}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{parskip}
+\usepackage[most]{tcolorbox}
+
+\definecolor{ink}{RGB}{28,32,38}
+\definecolor{accent}{RGB}{20,72,168}
+\definecolor{cmt}{RGB}{110,120,132}
+\definecolor{rule}{RGB}{210,216,224}
+\definecolor{cardbg}{RGB}{248,250,253}
+\definecolor{good}{RGB}{40,125,75}
+\definecolor{bad}{RGB}{185,95,20}
+
+\usepackage[colorlinks=true,linkcolor=accent,urlcolor=accent]{hyperref}
+
+\titleformat{\section}{\Large\bfseries\color{ink}}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\large\bfseries\color{accent}}{}{0em}{}
+\titlespacing*{\section}{0pt}{1.0em}{0.4em}
+\titlespacing*{\subsection}{0pt}{0.8em}{0.3em}
+
+\pagestyle{fancy}\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{rule}\leaders\hrule height \headrulewidth\hfill}}
+\fancyhead[L]{\small\color{cmt}GARF — Reading the output · cheat sheet}
+\fancyhead[R]{\small\color{cmt}\thepage}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\opt}[1]{\texttt{\textbf{#1}}}
+\newcommand{\good}{\textcolor{good}{\textbf{Good}}}
+\newcommand{\bad}{\textcolor{bad}{\textbf{Concern}}}
+\newcommand{\act}{\textbf{Action}}
+
+% ---- one card per object ---------------------------------------------------
+% \begin{card}{Name}{stands for}{where it appears}
+%   \what{...} \howread{...} \interp{...}
+% \end{card}
+\newtcolorbox{card}[3]{enhanced,breakable,colback=cardbg,colframe=accent!60,boxrule=0.5pt,arc=2pt,
+  left=6pt,right=6pt,top=4pt,bottom=2pt,before skip=5pt,after skip=5pt,
+  before upper={\parskip=0pt\raggedright},
+  title={\textbf{#1}\quad{\normalfont\small #2}\hfill{\normalfont\scriptsize #3}},
+  coltitle=white,colbacktitle=accent!85,fonttitle=\small}
+\newlength{\cardlab}\setlength{\cardlab}{2.35cm}
+\newcommand{\cardrow}[2]{\par\noindent\hangindent=\cardlab\hangafter=1%
+  \makebox[\cardlab][l]{\small\bfseries\color{accent}#1}{\small #2}\par\vspace{2pt}}
+\newcommand{\what}[1]{\cardrow{What}{#1}}
+\newcommand{\howread}[1]{\cardrow{How to read}{#1}}
+\newcommand{\interp}[1]{\cardrow{Interpret}{#1}}
+
+\begin{document}
+
+% ---------------- title ----------------
+\thispagestyle{empty}
+\begin{center}
+{\LARGE\bfseries\color{ink} GARF — Reading the output}\\[0.35em]
+{\large\color{accent} A cheat sheet: every quantity, what it means, how to read it, how to interpret it}\\[0.6em]
+{\normalsize \texttt{garf} (matching) \;·\; \texttt{DIAGNOSTICS} (design checks) \;·\; \texttt{garfte} (estimation)}\\[0.3em]
+{\color{cmt}\small GARF-binary · version 1.2 · companion to the \emph{Installation \& Use Guide}}\\[0.5em]
+{\small Federico Fantechi, PhD · University of Palermo · \texttt{federico.fantechi@unipa.it}}
+\end{center}
+\vspace{0.2em}
+\hrule height 0.4pt
+\vspace{0.5em}
+
+\noindent\textbf{How the sheet works.} One card per quantity. The card's title bar gives its name,
+what the acronym stands for and where it appears; then three rows: \textbf{What} it is, \textbf{How to
+read} it (scale, range, what a value means), and how to \textbf{Interpret} it (\good, \bad, \act).
+The three parts follow the order of work: \textbf{1}~match with \code{garf}; \textbf{2}~check the design
+with \code{DIAGNOSTICS}; \textbf{3}~estimate with \code{garfte}. Section~\ref{sec:cheat} puts the
+rules of thumb on one page. Examples (``e.g.'') come from a firm panel: 311{,}398 firms, 2009--2019,
+$T_0=2016$, 423 treated, $k=25$, caliper 0.2.
+
+\noindent\textbf{Golden rule.} Parts 1 and 2 use pre-treatment information only: revise the design
+(covariates, $k$, caliper, \opt{wpower()}, replacement) as often as needed \emph{there}. Once you look
+at Part 3, the design is fixed --- changing it because of the estimated effect is specification search.
+
+\noindent\textbf{Notation.} Treated unit $i$, donor (matched control) $j$, period $t$, onset $T_0$,
+matching window of $L$ periods before $T_0$, block = a treated unit and its donors, $w_{ij}$ donor
+weights ($\sum_j w_{ij}=1$ in each block).
+
+\vspace{-0.4em}
+\tableofcontents
+
+% =====================================================================
+\section{\texttt{garf}: the matching}\label{sec:garf}
+
+\subsection{Sample and design matrix}
+
+\begin{card}{Units dropped}{incomplete pre-window}{engine log}
+\what{Units removed because the outcome or a time-varying covariate is missing in at least one period
+of the matching window $[T_0-L,\,T_0-1]$. Only units complete on \emph{all} of them enter the match.}
+\howread{A count, printed as a warning. Compare it with the units received.}
+\interp{\good: a small share. \bad: a large share (e.g.\ 217{,}719 of 311{,}398, 70\%), or treated units
+dropped more than controls --- the matched population is ``units fully observed on these variables''.
+\act: find the variables with most gaps; drop them from \opt{tvarying()} or shorten \opt{npre()}.}
+\end{card}
+
+\begin{card}{Features}{pre-treatment design matrix}{engine log · \code{features.csv}}
+\what{What the forest sees. Per time-varying variable (outcome included): the $L$ lags and 7 trajectory
+descriptors --- \code{mean}, \code{delta} (last $-$ first), \code{growth} (symmetric, in $[-2,2]$),
+\code{slope}, \code{vol} (s.d.\ of changes), \code{curv} (late minus early slope), \code{dip} (last minus
+mean of the others); plus one column per time-invariant covariate.}
+\howread{``units $\times$ features''. With $L=5$: 12 features per time-varying variable (e.g.\ $12\times12+3=147$).}
+\interp{Matching is on levels \emph{and} dynamics. The outcome is just the first time-varying variable
+(no need to list it again). Trees use thresholds: heavy-tailed amounts are better as ratios, logs or asinh.}
+\end{card}
+
+\begin{card}{Treated / Control / Treated matched}{block counts}{summary · \code{r(n\_treated)}, \code{r(n\_treated\_matched)}}
+\what{Units that entered the match, and treated units with at least one donor.}
+\howread{Matched $<$ treated only with a caliper: treated units with no control above it get no donor.}
+\interp{The effect estimated later is the effect on the \emph{matched} treated. \bad: many unmatched
+(e.g.\ 106 of 423), or unmatched systematically different (\code{blocks.csv}, \code{matched}=0). \act:
+report it; compare matched vs unmatched on pre-treatment characteristics; consider a looser caliper.}
+\end{card}
+
+\subsection{Similarity and weights}
+
+\begin{card}{Proximity}{forest (leaf) proximity}{\code{matches.csv} · \code{proximity\_minmax}}
+\what{Similarity of a donor to a treated unit as seen by the forest: how often (weighted by leaf size)
+the two fall in the same leaf. \code{proximity\_minmax} rescales it to $[0,1]$ over the run.}
+\howread{0 = least similar pair in the run, 1 = most similar pair. Relative to the run, not comparable across runs.}
+\interp{The basis of donor ranking, the caliper and the weights. Many donors near 0: poor overlap (card \emph{Overlap}).}
+\end{card}
+
+\begin{card}{Co-occurrence}{share of trees with a shared leaf}{\code{cooccurrence}}
+\what{Share of trees in which donor and treated unit end in the same leaf.}
+\howread{Between 0 and 1; not rescaled, so comparable across designs that share the same forest.}
+\interp{Higher = closer in every direction the forest cares about. Input of FMQ.}
+\end{card}
+
+\begin{card}{Caliper}{minimum normalised proximity}{option \opt{caliper()}}
+\what{Donors with \code{proximity\_minmax} below the caliper are not allowed.}
+\howread{On the normalised $[0,1]$ scale; 0 = no caliper.}
+\interp{Trades bias (closer donors) for coverage (unmatched treated). Choose it on the frontier and on
+\emph{FMQ all treated}, not on matched-only statistics.}
+\end{card}
+
+\begin{card}{weight}{design weight, $w_{ij}\propto\text{proximity}^\gamma$}{variable \code{weight} · option \opt{wpower()}}
+\what{Treated rows: 1. Donor rows: proximity to the power $\gamma$, normalised to sum to 1 in the block.}
+\howread{$\gamma=0$ equal weights; $\gamma=1$ (default) proportional to proximity; $\gamma>1$ concentrates on the closest.}
+\interp{Summing to 1 makes the counterfactual a weighted \emph{mean}, cancels shocks common to all units,
+and gives every treated unit the same mass in the ATT. Use as \code{[pw=weight]}. Non-negativity: no
+extrapolation outside the donors' range.}
+\end{card}
+
+\subsection{Quality of the match}
+
+\begin{card}{SMD}{Standardised Mean Difference}{summary · \code{r(mean\_smd\_matched)} · \code{balance.csv} · 02, 04}
+\what{For each feature: treated mean minus comparison mean, divided by the raw pooled s.d. (the same
+scale before and after matching). \emph{Raw}: vs all controls; \emph{matched}: vs weighted donors.}
+\howread{$|\text{SMD}|$ in s.d.\ units. Summary: mean and max over all features.}
+\interp{\good: $<0.10$. \bad: $0.10$--$0.25$ (needs adjustment), $>0.25$ (a weighted comparison will
+not remove it). Read the max, not only the mean (e.g.\ max 0.174). \act: 02 tells which variable and
+whether level or dynamics.}
+\end{card}
+
+\begin{card}{ESS}{Effective Sample Size (of donors)}{summary · \code{r(mean\_ess)} · \code{blocks.csv} · 07}
+\what{$\text{ESS}_i=1/\sum_j w_{ij}^2$: how many equally weighted donors the weights are worth.}
+\howread{From 1 (one donor carries everything) to the number of donors (equal weights). E.g.\ 5.3 of 25.}
+\interp{The \emph{variance} side of the design. ESS well below $k$ is normal with proximity weights.
+\bad: 1--2 --- a thin, noisy counterfactual. \act: lower \opt{wpower()} or raise $k$.}
+\end{card}
+
+\begin{card}{FMQ}{Forest Match Quality}{summary · \code{r(fmq\_mean)}, \code{r(fmq\_mean\_all)} · 09, 12}
+\what{$\text{FMQ}_i=(S_i-\bar c_i)/(S_i^{\max}-\bar c_i)$: weighted co-occurrence with the donors ($S_i$),
+relative to random controls ($\bar c_i$) and to the best control in the data ($S_i^{\max}$).}
+\howread{0 = no closer than random controls; 1 = every donor as close as the best available. \emph{p10}: the
+10\% worst blocks. \emph{All treated}: unmatched count as 0.}
+\interp{The \emph{bias} side of the design, and \emph{relative}: compare designs sharing the same forest,
+never an absolute target. Rises mechanically with fewer, closer donors --- read it with ESS (frontier).
+With a caliper compare on \emph{all treated} (e.g.\ 0.662 matched vs 0.496 all).}
+\end{card}
+
+\begin{card}{Twin FMQ}{FMQ scaled by the best twin (earlier definition)}{log · \code{blocks.csv} · 09}
+\what{Earlier version of FMQ, kept for comparison: co-occurrence relative to the closest control only.}
+\howread{Small numbers on large pools; not comparable with FMQ.}
+\interp{Secondary. Use FMQ.}
+\end{card}
+
+\begin{card}{Distinct donors / reuse}{size of the comparison group}{summary · 07}
+\what{How many different controls serve as donors; with replacement one control can serve several treated.}
+\howread{Compare with matched $\times\,k$: e.g.\ 890 donors for $317\times25=7{,}925$ slots $\approx$ 9 uses each.}
+\interp{Reuse is not wrong (each treated keeps its best donors), but estimates rest on fewer controls,
+blocks become dependent (the \code{gap} SEs correct for it) and \code{method(did)} needs a match without replacement.}
+\end{card}
+
+\subsection{How separable the groups are}
+
+\begin{card}{AUC}{Area Under the ROC Curve (out-of-bag)}{summary · \code{r(oob\_auc)} · 10}
+\what{Probability that the forest ranks a random treated unit above a random control, on units it did not train on.}
+\howread{0.5 = indistinguishable; 1 = perfectly separable.}
+\interp{0.5--0.7: little selection, good overlap. 0.7--0.85: real selection, matching matters.
+\bad: $>0.85$--$0.9$ (e.g.\ 0.907): treated easy to pick out, overlap limited --- expect unmatched
+treated under a caliper and some low-FMQ blocks; check Overlap. Describes the data, not a GARF failure.}
+\end{card}
+
+\begin{card}{OOB bal.acc / acc}{Out-Of-Bag balanced accuracy / accuracy}{summary · \code{r(oob\_bacc)}, \code{r(oob\_score)}}
+\what{Hit rates out of bag: balanced = mean of the hit rates in the two groups (threshold 0.5); accuracy = overall share right.}
+\howread{Balanced accuracy stays near 0.5 when treatment is rare; accuracy approaches the control share.}
+\interp{Read the AUC first. Accuracy 0.995 with 99.5\% controls says nothing.}
+\end{card}
+
+% =====================================================================
+\section{\texttt{DIAGNOSTICS}: checking the design}\label{sec:diag}
+
+Run after \code{garf}, with the matched panel in memory: \code{do "\$GARF\_HOME/DIAGNOSTICS/00\_master.do"}.
+Check the settings it prints first. Numbers refer to the do-files; tables go to the log, figures to
+\code{./garf\_diagnostics}.
+
+\subsection{Balance}
+
+\begin{card}{Balance by component}{SMD by variable $\times$ levels/dynamics}{02 · log table}
+\what{Per variable: mean and max $|$SMD$|$ raw and matched, separately for \emph{levels} (lags, mean) and
+\emph{dynamics} (delta, growth, slope, vol, curv, dip); count above 0.10, 0.25, and of features that got worse.}
+\howread{One row per variable and component.}
+\interp{Locates the imbalance the summary only counts. Levels balanced but dynamics not: same height,
+different motion --- a warning for \code{gap} and for parallel trends. Many features worse on one variable:
+the forest barely uses it (see 10).}
+\end{card}
+
+\begin{card}{VR}{Variance Ratio}{03 · log table}
+\what{Variance among treated over the window divided by the variance in the comparison group, raw and matched.}
+\howread{1 = same spread.}
+\interp{\good: 0.5--2. \bad: outside --- donors do not cover the treated's range, typically the tails,
+even when means are balanced.}
+\end{card}
+
+\begin{card}{SMD over time}{balance by period}{04 · \code{fig\_balance\_time.pdf}}
+\what{SMD by period and variable: raw (solid) and matched (dashed), with $\pm0.1$ and the window start marked.}
+\howread{Inside the window: matched by construction. \emph{Before} the window: out of sample.}
+\interp{\good: dashed line near 0 also before the window --- the match captures the history, not only $L$
+periods of it. \bad: dashed line drifting away the further back --- treated and donors converged only recently.}
+\end{card}
+
+\begin{card}{Outcome path}{treated vs counterfactual vs all controls}{05 · \code{fig\_outcome\_path.pdf}}
+\what{Mean outcome up to the end of the window: treated (solid), GARF counterfactual (dashed), all controls (grey).}
+\howread{Grey--solid distance = selection; dashed--solid distance = what is left after matching.}
+\interp{\good: close in the window, parallel before. A constant dashed--solid gap is a level difference:
+harmless for \code{did}, fatal for \code{gap}.}
+\end{card}
+
+\subsection{The placebo}
+
+\begin{card}{Placebo gap}{design backdated by $H$ periods}{06 · \code{fig\_placebo.pdf}}
+\what{Your design rerun with the onset moved back by $H$ (default 3, lowered automatically if the data are
+too short), on pre-treatment data. True effect in the pseudo-post period: zero.}
+\howread{Treated minus counterfactual (dashed) vs treated minus all controls (grey) across window and pseudo-post.}
+\interp{The most direct test of the design. \good: dashed line flat into the pseudo-post period. \bad: a
+gap that opens --- the same would happen after the real $T_0$ and look like an effect. E.g.\ data from 2009,
+$T_0=2016$, $L=5$: $H=2$, onset 2014.}
+\end{card}
+
+\subsection{Donors and overlap}
+
+\begin{card}{$\omega_j$, top shares}{implied donor weight and concentration}{07 · log tables}
+\what{$\omega_j=\sum_i w_{ij}$: total weight of donor $j$ across blocks (they sum to the number of treated).
+Pool summaries: effective number of donors $(\sum\omega)^2/\sum\omega^2$; share of weight on the top 1, 2, 10.}
+\howread{Reuse = number of blocks a donor serves; $\omega$ = how much it counts overall.}
+\interp{\bad: a few donors carrying a large share (top 10 above about 20--30\%) --- every estimate depends
+on them. \act: look at who they are; expect wider \code{gap} intervals.}
+\end{card}
+
+\begin{card}{Overlap}{best proximity · overlap mass}{08 · \code{fig\_overlap.pdf} · \code{blocks.csv}}
+\what{Per treated unit: \code{best\_proximity\_minmax} (normalised proximity of its best donor) and
+\code{overlap\_mass} (share of trees with at least one control in its leaf).}
+\howread{Histograms over treated units; the log lists the weakest and the unmatched.}
+\interp{\bad: mass near 0 --- treated units with no close control; a caliper drops them, otherwise their
+effect is extrapolated. With caliper $c$, units left of $c$ on the first histogram are the unmatched.}
+\end{card}
+
+\begin{card}{FMQ components}{$S_i$, $\bar c_i$, $S^{\max}_i$}{09 · log table}
+\what{\code{match\_cooccurrence} ($S_i$), \code{random\_cooccurrence} ($\bar c_i$), \code{best\_cooccurrence}
+($S^{\max}_i$) behind each FMQ; the five lowest-FMQ blocks are listed.}
+\howread{The three numbers explain a low FMQ.}
+\interp{High $\bar c_i$: a \emph{typical} unit, any control is close --- not a problem. Low $\bar c_i$, low $S_i$,
+low overlap mass: an \emph{isolated} unit --- weak counterfactual.}
+\end{card}
+
+\subsection{The forest and the choice of design}
+
+\begin{card}{MDI importance}{Mean Decrease in Impurity}{10 · log}
+\what{The fifteen features the forest relies on most to tell treated from controls, plus the out-of-bag fit.}
+\howread{Group them by variable and by type (level vs dynamic).}
+\interp{What selection into treatment runs on. Dynamics on top: selection on trajectories --- where GARF has
+its edge over matching on levels. One variable dominating: needs a substantive explanation.}
+\end{card}
+
+\begin{card}{Sensitivity grid}{19 designs + yours}{11 · \code{sens.dta}}
+\what{\code{garf} rerun varying one choice at a time: $k$, $\gamma$, caliper, replacement, seed; plus your design.
+Per design: SMD, ESS, FMQ, donors, matched. Skipped on pools of 20{,}000+ units unless \code{GARF\_GRID on}.}
+\howread{Compare rows; seeds 1--5 show forest noise.}
+\interp{\good: stable balance across seeds and small changes. \bad: balance collapsing for a small change ---
+fragile design. Choose the design here, before any estimate.}
+\end{card}
+
+\begin{card}{Frontier}{FMQ vs ESS across designs}{12 · \code{fig\_frontier.pdf}}
+\what{FMQ (all treated) against mean ESS (log scale), one point per design; your design is a filled square.}
+\howread{The $k$ line is the trade-off: moving right buys effective sample size with closeness.}
+\interp{\good: your design on or above the line --- little FMQ given up for a large gain in ESS.
+Designs above the line beat the $k$ trade-off.}
+\end{card}
+
+% =====================================================================
+\section{\texttt{garfte}: the estimation}\label{sec:te}
+
+\begin{card}{Gap}{treated minus own counterfactual}{the building block of both methods}
+\what{$G_{it}=Y_{it}-\sum_j\tilde w_{ij}Y_{jt}$, with $\tilde w$ the weights renormalised over the donors observed in $t$.}
+\howread{In outcome units; one per treated unit and period.}
+\interp{Everything \code{garfte} reports is an average of $G$ or of $G$ minus its window mean.}
+\end{card}
+
+\begin{card}{\code{method(did)}}{matching Difference-in-Differences}{\code{garfte, method(did)}}
+\what{$\tau_i(e)=G_{i,T_0+e}-\bar G_i$, $\bar G_i$ = mean gap over the matching window. Synthetic-DiD analogue.}
+\howread{Effect net of any constant level difference left by the match.}
+\interp{Assumes parallel trends conditional on the match. Needs a match \emph{without} replacement
+(checked). The default for several outcomes and for heavy-tailed variables.}
+\end{card}
+
+\begin{card}{\code{method(gap)}}{the gap in levels}{\code{garfte, method(gap)}}
+\what{$\tau_i(e)=G_{i,T_0+e}$. Synthetic-control analogue.}
+\howread{Effect in levels; window rows show the leftover level difference.}
+\interp{Assumes no unmatched level or trend difference. Credible only if the window gap is small (next cards).
+Replacement allowed.}
+\end{card}
+
+\begin{card}{ATT, ATT($e$)}{Average Treatment effect on the Treated (by event time)}{table · \code{e(b)} · \code{e(att)}}
+\what{ATT($e$): simple average over treated units of $\tau_i(e)$. ATT: equal-weight average of the post ATT($e$).}
+\howread{In outcome units, per treated unit (each counts once, whatever its number of donors).}
+\interp{The shape of the post ATT($e$) (jump, build-up, fade) often says more than the overall ATT. Weighting treated
+units by size is a different estimand: average \code{tau} from the units file with those weights.}
+\end{card}
+
+\begin{card}{$e$, period}{event time and period label}{table}
+\what{$e$ = year $-\,T_0$ ($e=0$: first treated period). Labels: \code{pre} (before the window, never matched on),
+\code{window} (matched on), \code{pre (window)} (window, outcome not matched on), \code{post} (effects).}
+\howread{\code{pre(\#)}, \code{post(\#)} trim the range shown.}
+\interp{\textbf{Window rows are not a pre-trends test} (\code{did}: they sum to 0; \code{gap}: small by construction).
+\textbf{Pre rows are}: near 0 with \code{did}, near the window level with \code{gap}.}
+\end{card}
+
+\begin{card}{Window gap}{mean gap in the matching window}{\code{gap} footer · \code{e(mean\_window\_gap)} · \code{pre\_gap\_mean}}
+\what{Average pre-treatment level difference between treated and their donors.}
+\howread{In outcome units, against the overall ATT.}
+\interp{\good: small relative to the ATT. \bad: a sizable share --- part of the ``effect'' was there before
+treatment; read \code{did}. E.g.\ window gap 53, pre gap 51, post 104--257: a stable level difference of about 50.}
+\end{card}
+
+\begin{card}{SE, CI, $p$, df}{Standard Error, Confidence Interval, $t$ degrees of freedom}{table · \code{e(V)} · \opt{level()}}
+\what{Conditional on the matched design. Clustered by block; \code{gap} adds the correction for donors shared
+between blocks. Student $t$ with (treated units $-1$) df; \opt{level()} default 95.}
+\howread{As usual; the CI is also the band in the graph.}
+\interp{\bad: fewer than about 30 treated units (warning) --- cluster-type SEs can be too small. Many outcomes:
+adjust for multiple testing (Holm, Romano--Wolf) or name a primary outcome.}
+\end{card}
+
+\begin{card}{N}{treated units with a defined gap at $e$}{table}
+\what{How many treated units contribute to ATT($e$).}
+\howread{Falls when units exit or have missing outcomes.}
+\interp{A falling N changes the population behind each ATT($e$). \bad: if treatment affects survival.
+\act: compare with a balanced subset.}
+\end{card}
+
+\begin{card}{Renormalised / skipped cells}{missing donor-periods}{notes · \code{n\_donors\_obs}}
+\what{Cells where some donors are missing (weights renormalised over those observed) or where no gap exists (skipped).}
+\howread{Counts in the notes; per cell in the units file.}
+\interp{Fine when few cells and few donors are involved; check \code{n\_donors\_obs} where many are.}
+\end{card}
+
+\begin{card}{tau (units file)}{unit-level effect}{\code{garfte\_<method>\_units.csv}}
+\what{One effect per treated unit and period, with \code{pre\_gap\_mean}, \code{n\_donors}, \code{ess}, \code{fmq}.}
+\howread{Group or regress on characteristics of the treated (fixed at or before $T_0$).}
+\interp{Noisy: their spread overstates true heterogeneity, regression coefficients are fine. With shared donors
+they are correlated (plain OLS SEs too small). Check mean vs median: a few units may drive the ATT.}
+\end{card}
+
+\begin{card}{Event-study graph}{ATT($e$) with confidence band}{\code{garfte\_<method>.gph/.pdf}}
+\what{Line with \opt{level()}\% band, window shaded, dashed line at the onset, overall ATT in the subtitle.}
+\howread{Left of the window: pre periods; shaded: window; right of the dashed line: effects.}
+\interp{Flat before the window (\code{did}: at 0; \code{gap}: at the window level). A widening band late in the
+panel reflects fewer, more dispersed treated units.}
+\end{card}
+
+\begin{card}{did vs gap}{bracketing}{run both on a match without replacement}
+\what{Under fairly general conditions the two bracket the true effect.}
+\howread{Compare their post ATT($e$) and their window/pre rows.}
+\interp{Equal, small window gap, flat pre rows: robust. \code{gap} $>$ \code{did} with a stable pre gap: level
+difference --- read \code{did}. \code{did} pre rows trending: parallel trends in doubt (check 04, 06). Placebo gap too:
+the effect is not credible.}
+\end{card}
+
+% =====================================================================
+\section{Rules of thumb on one page}\label{sec:cheat}
+
+\renewcommand{\arraystretch}{1.12}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.34\textwidth}>{\raggedright\arraybackslash}p{0.2\textwidth}X@{}}
+\toprule
+Quantity & \good & \bad\\
+\midrule
+Units dropped (incomplete window) & small share & large share; treated dropped more\\
+Treated matched / treated & close to 1 & unmatched differ systematically\\
+SMD matched, mean & $<0.10$ & $>0.10$\\
+SMD matched, max & $<0.10$--$0.25$ & $>0.25$\\
+VR, Variance Ratio (03) & 0.5--2 & outside\\
+AUC (out-of-bag) & 0.5--0.8 & $>0.85$--$0.9$: limited overlap\\
+OOB balanced accuracy & read only with AUC & ---\\
+ESS per treated & several donors & 1--2\\
+FMQ & compare designs, with ESS & never on its own\\
+SMD before the window (04) & near 0 & drifting\\
+Placebo gap (06) & flat & opening in pseudo-post\\
+Weight on top 10 donors (07) & small share & a few donors carry the design\\
+Overlap (08) & little mass near 0 & many treated with no close control\\
+\code{garfte}: window gap (\code{gap}) & small vs ATT & sizable share of ATT\\
+\code{garfte}: pre rows (\code{did}) & near 0 & trending\\
+\code{garfte}: treated units (clusters) & $\ge 30$ & fewer\\
+\code{garfte}: N over $e$ & stable & falling (exits)\\
+\bottomrule
+\end{tabularx}
+
+\vfill
+\begin{center}\small\color{cmt}
+GARF-binary · version 1.2 · Reading the output · Federico Fantechi, University of Palermo\\
+Rules of thumb, not tests: read every number in the context of the design and the data.
+\end{center}
+
+\end{document}

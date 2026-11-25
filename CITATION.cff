@@ -4,8 +4,8 @@ cff-version: 1.2.0
 message: "If you use GARF, please cite the software and the paper below."
 type: software
 title: "GARF: Group-Aware Random Forest matching for panel counterfactuals (Stata command and Python engine)"
-version: "1.1"                   
-date-released: "2026-11-17"      
+version: "1.2"                   
+date-released: "2026-11-25"      
 license: MIT
 repository-code: "https://github.com/federico-fantechi/garf" 
 doi: 10.5281/zenodo.24303486   
@@ -30,4 +30,4 @@ preferred-citation:
       given-names: Federico
   year: 2026
   notes: "Working paper, University of Palermo"
-  # url: "https://arxiv.org/abs/XXXX.XXXXX"               # ADD after arXiv
+  url: "https://dx.doi.org/10.2139/ssrn.7719438"               

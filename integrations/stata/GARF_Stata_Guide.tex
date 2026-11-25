@@ -60,8 +60,8 @@
 \begin{center}
 {\Huge\bfseries\color{ink} GARF for Stata}\\[0.4em]
 {\Large\color{accent} Installation \& Use Guide}\\[1.0em]
-{\large The \texttt{garf} command — forest-proximity matching for panel counterfactuals}\\[0.4em]
-{\color{cmt}\small Binary build · \textbf{version 1.1} · this guide covers the \texttt{garf.ado} command}\\[0.7em]
+{\large The \texttt{garf} and \texttt{garfte} commands — forest-proximity matching for panel counterfactuals, and the effect estimates that follow}\\[0.4em]
+{\color{cmt}\small Binary build · \textbf{version 1.2} · this guide covers \texttt{garf.ado} and \texttt{garfte.ado}}\\[0.7em]
 {\small Federico Fantechi, PhD · Department of Economics, Business and Statistics · University of Palermo}\\[0.15em]
 {\small \texttt{federico.fantechi@unipa.it}}
 \end{center}
@@ -71,6 +71,16 @@
 
 \begin{center}
 \fcolorbox{accent}{codebg}{\parbox{0.94\textwidth}{\small
+\textbf{New in version 1.2: the estimation stage.} The companion command \code{garfte} runs
+after \code{garf} and estimates the effect on the treated from the matched panel: a matching
+difference-in-differences (\opt{method(did)}) or the treated-minus-own-donors gap in levels
+(\opt{method(gap)}), by event time and overall, with an event-study graph, \code{e(b)}/\code{e(V)},
+and the effect of each treated unit in a file (\S\ref{sec:garfte}). \code{garf} computes exactly as
+in 1.1; it now stores its settings on the loaded panel (characteristics \code{\_dta[garf\_*]}, read
+by \code{garfte}), imports the matched panel in double precision, and ends with a short ``Next
+steps'' note.
+
+\medskip
 \textbf{Version 1.1} is the first public release. It is the development build beta~1.5 with three changes to the Stata command: names and paths are quoted in the configuration file passed to the engine, the data are exported without value labels, and the temporary copy of the data is erased after the run. The notes below keep the development numbering.
 
 \medskip
@@ -118,7 +128,8 @@ column/variable. The raw \code{proximity} column is unchanged.}}
 {\small
 \textbf{In one line.} \code{garf} runs the \emph{Group Aware Random Forest} Python engine from
 inside Stata and brings the results back: you give it a panel and it returns a \emph{matched
-donor panel} ready for a weighted difference-in-differences.
+donor panel} ready for a weighted difference-in-differences; \code{garfte} then estimates the
+effect on that panel.
 
 \smallskip
 \noindent The \emph{Group Aware Random Forest} (GARF) identifies matching (untreated)
@@ -129,7 +140,8 @@ flexible, adjustable for issues such as a low number of treated units and featur
 parameters that can be tuned for better precision.
 
 \smallskip
-\noindent It does not estimate the treatment effect itself --- that stays in Stata, in your hands.}
+\noindent \code{garf} itself does not estimate the treatment effect: the companion command
+\code{garfte} does (\S\ref{sec:garfte}), or you take the matched panel to your own estimator.}
 
 \vspace{0.4em}
 \hrule height 0.4pt
@@ -157,9 +169,11 @@ When you run \code{garf}, the command:
       the DiD immediately; \code{store} / \code{export()} additionally write the CSV outputs.
 \end{enumerate}
 
-The division of labour is deliberate: \textbf{GARF selects the comparison group; you estimate
-the effect.} The natural boundary is exactly the language boundary --- Python builds the
-matched panel, Stata runs the weighted DiD (\code{reghdfe}, \code{xtreg}, \code{didregress}).
+The division of labour is deliberate: \textbf{\code{garf} selects the comparison group; the
+effect is estimated in a separate step}, either with the package's \code{garfte} (a second Python
+file, \code{garf\_estimate.py}, driven the same way; \S\ref{sec:garfte}) or with your own weighted
+DiD (\code{reghdfe}, \code{xtreg}, \code{didregress}). The design can thus be fixed, and checked
+with the diagnostics, before any effect is looked at.
 
 \medskip
 \noindent\textbf{Why the shell-out design.} It reuses the package's own Python environment
@@ -216,12 +230,12 @@ with:
 which garf     // should print the path to garf.ado
 \end{stata}
 
-\textbf{(b) Permanently} --- copy \code{garf.ado} and \code{garf.sthlp} into your PERSONAL
-ado folder. Find it with:
+\textbf{(b) Permanently} --- copy \code{garf.ado}, \code{garf.sthlp}, \code{garfte.ado} and
+\code{garfte.sthlp} into your PERSONAL ado folder. Find it with:
 \begin{stata}
 sysdir
 \end{stata}
-and copy the two files into the folder shown next to \code{PERSONAL} (create it if needed).
+and copy the four files into the folder shown next to \code{PERSONAL} (create it if needed).
 Stata will then find \code{garf} in every session. Keep the \code{GARF-binary} folder itself in a
 fixed place: \code{garf} finds the engine through \code{GARF\_HOME} (Step 3).
 
@@ -231,7 +245,8 @@ the \emph{current} folder before the ado-path, so an old copy left in a working 
 takes precedence over the one in PERSONAL. After installing or updating, run
 \begin{stata}
 discard        // drop any garf already loaded in this session
-which garf     // the first line must read: version 1.1
+which garf     // the first line must read: version 1.2
+which garfte   // the first line must read: version 1.2
 \end{stata}
 
 \subsection{Step 3 --- point Stata at the package}
@@ -247,6 +262,7 @@ line) to your \code{profile.do}, which Stata runs at startup.
 \begin{stata}
 which garf     // prints the path to garf.ado if the ado-path is right
 help garf      // opens the help file
+help garfte    // the estimation stage
 \end{stata}
 If either comes up empty, the ado-path line is pointing at the wrong folder --- re-check that it
 ends in \code{/stata} (previous step). For an end-to-end check, run the package demo once (it writes
@@ -299,6 +315,26 @@ By default the matched panel is now \emph{in memory} and nothing was written to 
 sections show the variables it adds and how to estimate the DiD. This replaces the data in
 memory, so \code{preserve} or save first; add \code{store} to also keep the CSVs.
 
+The output ends with a short note on what to do next:
+\begin{console}
+--------------------------------------------------------------
+Next steps
+  Save the matched panel (it replaced your data; garfte's settings are saved with it):
+     save "garf_matched.dta", replace
+  Diagnostics (design stage, pre-treatment only): see help garf, Diagnostics
+     with this matched panel in memory (its settings are read from it, nothing to edit):
+     do "/Users/you/GARF-binary/DIAGNOSTICS/00_master.do"   (balance, placebo, overlap, FMQ, sensitivity)
+  Estimation: garfte, after garf
+     garfte, method(gap)   treated minus its own donors, in levels
+     method(did), the matching DiD, needs a panel matched without replacement:
+     rerun garf with noreplacement (and a k the donor pool can supply), then garfte, method(did)
+--------------------------------------------------------------
+\end{console}
+Then estimate the effect (\S\ref{sec:garfte}):
+\begin{stata}
+garfte, method(gap)
+\end{stata}
+
 % =====================================================================
 \section{Command reference}
 
@@ -314,7 +350,7 @@ garf [if] [in], treatment(varname) outcome(varname) id(varname)
 Option & Meaning\\
 \midrule
 \opt{treatment(varname)} & binary treatment column (1 in treated years, else 0)\\
-\opt{outcome(varname)}   & the outcome variable\\
+\opt{outcome(varname)}   & the outcome variable. For the matching it is simply the first time-varying variable, treated exactly like those in \opt{tvarying()} (same pre-window features; the forest is fit on the treatment, never on the outcome). Naming it serves reporting and later steps: \code{garfte} estimates on it by default, the diagnostics plot its path and placebo gap. No need to repeat it in \opt{tvarying()}\\
 \opt{id(varname)}        & unit identifier\\
 \opt{time(varname)}      & time variable\\
 \opt{t0(\#)}             & treatment onset period $T_0$\\
@@ -643,22 +679,46 @@ Every file uses pre-treatment information only, so the whole protocol can be run
 revised, before any outcome is analysed.
 
 \medskip
-\noindent\textbf{Run it on the demonstration panel.} Generate the demo panel once
-(\code{demo/run\_demo.sh} or \code{.bat}), \code{cd} to a project folder (not the package
-folder), then:
+\noindent\textbf{Run it after your own \code{garf} --- nothing to edit.} \code{garf} stores its whole
+design on the matched panel (characteristics \code{\_dta[garf\_*]}: variables, $T_0$, window, $k$,
+caliper, \opt{wpower()}, replacement, seed, forest options, the \code{if}/\code{in} sample and the
+file it ran on). With the matched panel in memory (or after \code{use garf\_matched.dta}),
+\code{cd} to your project folder and run
 \begin{stata}
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2) store
 do "$GARF_HOME/DIAGNOSTICS/00_master.do"
 \end{stata}
-Tables are printed in the log; data and figures go to \code{./garf\_diagnostics}.
+The diagnostics then describe \emph{your} design. \code{garf} records the \code{.dta} the data were
+loaded from, and the diagnostics check that it still holds \code{garf}'s variables and the same
+number of rows (sorting or \code{xtset} after loading are fine). If not --- data imported from CSV,
+variables created or rows dropped after loading --- save the panel \code{garf} ran on and set its
+path first:
+\begin{stata}
+global GARF_DATA "/path/to/panel.dta"
+\end{stata}
+\noindent With \opt{store}
+(or \opt{export()}/\opt{outdir()}) the diagnostics read \code{garf}'s files directly; without it,
+\code{01\_first\_run.do} runs your design once more, with the same seed, to recreate them.
+Tables are printed in the log; data and figures go to \code{./garf\_diagnostics}, and at the end
+Stata is back in your folder with the matched panel in memory. The placebo backdates your design
+by $H=3$ periods, fewer if the data do not reach back far enough for a full window. The
+sensitivity grid (19 designs plus yours) is skipped on pools of 20{,}000 units or more unless
+\code{global GARF\_GRID on} is set.
+
+\medskip
+\noindent\textbf{Run it on the demonstration panel.} Generate the demo panel once
+(\code{demo/run\_demo.sh} or \code{.bat}), \code{cd} to a project folder (not the package
+folder) and run the same \code{do} command with no matched panel in memory: the manual settings
+of \code{00\_settings.do} (the demo panel) are used.
 
 \medskip
 \begin{tabularx}{\textwidth}{@{}lX@{}}
 \toprule
 File & What it does\\
 \midrule
-\code{00\_settings.do} & Data, variable names, $T_0$, window, default $k$, placebo backdating: the only file to edit\\
+\code{00\_settings.do} & Reads the settings from the matched panel in memory; otherwise the manual settings (demo panel)\\
 \code{00\_master.do} & Runs every step in order\\
-\code{01\_first\_run.do} & Default design; saves \code{raw.dta}, \code{matched.dta}, \code{garf\_output/}\\
+\code{01\_first\_run.do} & Saves \code{raw.dta} (garf's sample) and \code{matched.dta}; finds or recreates \code{garf}'s files\\
 \code{02\_balance\_features.do} & $|$SMD$|$ by variable and component (levels vs dynamics), features that worsen\\
 \code{03\_variance\_ratios.do} & Variance ratios, raw and matched\\
 \code{04\_balance\_over\_time.do} & SMD by period, raw and matched (\code{fig\_balance\_time.pdf})\\
@@ -668,30 +728,207 @@ File & What it does\\
 \code{08\_overlap.do} & Best-donor normalised proximity and overlap mass (\code{fig\_overlap.pdf})\\
 \code{09\_fmq\_blocks.do} & FMQ by block with its components, lowest-FMQ units\\
 \code{10\_forest\_importance.do} & Majority-class share and the top features from \code{diagnostics.json}\\
-\code{11\_sensitivity\_grid.do} & 19 designs over $k$, caliper, \opt{wpower()}, replacement and seed (\code{sens.dta}; slow)\\
+\code{11\_sensitivity\_grid.do} & 19 designs over $k$, caliper, \opt{wpower()}, replacement and seed, plus yours (\code{sens.dta}; slow)\\
 \code{12\_frontier.do} & FMQ--ESS frontier (\code{fig\_frontier.pdf})\\
 \bottomrule
 \end{tabularx}
 
 \medskip
-\noindent\textbf{Your own data.} Copy the folder to your project, edit only
-\code{00\_settings.do}, then point Stata at the copy:
-\begin{stata}
-global GARF_DIAG "/path/to/project/DIAGNOSTICS"
-do "$GARF_DIAG/00_master.do"
-\end{stata}
-To run a single step, run \code{00\_settings.do} and \code{01\_first\_run.do} once, then the step.
+\noindent\textbf{Settings by hand.} To run the protocol without a \code{garf} run first, copy the
+folder, edit the manual-settings block of \code{00\_settings.do}, and point Stata at the copy with
+\code{global GARF\_DIAG "/path/to/copy"}. To run a single step, run \code{00\_settings.do} and
+\code{01\_first\_run.do} once, then the step; the settings stay in force for the session
+(\code{macro drop GARF\_*} to start over).
 
 \medskip
 \noindent\textbf{Large donor pools.} The widest design of the sensitivity grid is the setting
-\code{KWIDE}, default \code{k(1000)}, in \code{00\_settings.do}. On pools below 1{,}000 untreated
+\code{KWIDE}, default \code{k(1000)} (set \code{global KWIDE} before running to change it). On pools below 1{,}000 untreated
 units it is the same as no cap (the forest kernel); on pools of tens of thousands, \opt{nokcap}
 can give thousands of donors per treated unit and a matched panel of tens of millions of rows. Each
 run of the grid builds the features, fits the forest and computes the proximities from scratch, so
 on large data the grid takes hours.
 
 % =====================================================================
-\section{From matched panel to treatment effect}
+\section{The estimation stage: \texttt{garfte}}\label{sec:garfte}
+
+\code{garf} builds the counterfactual: each treated unit $i$ gets a block of donors $j$ with
+weights $w_{ij}$ summing to 1. \code{garfte} (new in 1.2) is the step that comes after it. It runs
+the package's second Python file, \code{garf\_estimate.py}, with the same Python as \code{garf},
+and returns the effect on the treated by event time and overall: a table on screen, an
+event-study graph, \code{e(b)} and \code{e(V)}, and files that include the effect of \emph{each}
+treated unit in each period. \textbf{The data in memory are never changed.}
+
+\subsection{Syntax and options}
+\begin{stata}
+* on the matched panel garf left in memory
+garfte, method(did|gap) [options]
+* on a saved garf output folder
+garfte using "folder", method(did|gap) [options]
+\end{stata}
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+Option & Meaning\\
+\midrule
+\opt{method(did|gap)} & required; there is no default, because the two rest on different assumptions\\
+\opt{outcome(}\emph{name}\opt{)} & outcome to estimate on; default: the one \code{garf} matched on. Any numeric variable in the matched panel (e.g.\ merged in with \code{merge m:1 id year})\\
+\opt{pre(\#)} / \opt{post(\#)} & keep event times $e\ge-\#$ / $e\le\#$; default: all periods in the data\\
+\opt{level(\#)} & confidence level (per cent) for the table, the graph's band and the files; default 95, not affected by \code{set level}\\
+\opt{nograph} & no event-study graph\\
+\opt{outdir(}\emph{str}\opt{)} & folder for the result files; default \code{garf\_output/estimations} (or \emph{folder}\code{/estimations} when \code{garf} saved to a folder, or with \code{using})\\
+\opt{enginedir()} / \opt{python()} & as in \code{garf}\\
+\bottomrule
+\end{tabularx}
+
+\code{garfte} has no \code{if}/\code{in}: dropping rows of a matched panel would change the
+counterfactual. On the panel in memory it reads $T_0$, the matching window and the variable names
+from the characteristics \code{\_dta[garf\_*]} that \code{garf} stores (they survive
+\code{save}/\code{use}); with \code{using} it reads them from the folder's \code{diagnostics.json}.
+
+\subsection{The gap, and the two methods}
+Everything starts from the gap between a treated unit and its own GARF counterfactual,
+\[
+G_{it} \;=\; Y_{it} \;-\; \sum_j \tilde w_{ij}(t)\, Y_{jt},
+\]
+where $\tilde w_{ij}(t)$ are the \code{garf} weights renormalised over the donors observed in
+period $t$ (equal to $w_{ij}$ when no donor is missing).
+
+\medskip
+\noindent\textbf{\opt{method(did)} --- matching difference-in-differences.}
+\[
+\tau_i(e) \;=\; G_{i,T_0+e} \;-\; \bar G_i,\qquad
+\bar G_i = \text{mean of } G_{it} \text{ over the matching window } [T_0-L,\,T_0-1]
+\]
+(or $[T_0-L+1,\,T_0]$ with \opt{includet0}; then $T_0$ is a pre-treatment period and the effects
+start at $T_0+1$). Measuring the gap from its window mean removes any level difference left after
+matching. Identifying assumption: \emph{parallel trends conditional on the match}. This is the
+estimand of Callaway and Sant'Anna's ATT$(g,t)$ with a single cohort, and of trajectory balancing
+with demeaning (Hazlett and Xu), with the GARF weights in place of inverse-probability or balancing
+weights; the window mean as base averages out period-specific noise, as in synthetic DiD.
+
+\emph{It needs a panel matched without replacement.} With replacement, a donor serving several
+treated units makes their blocks dependent. \code{garfte} checks the panel itself: if any donor
+appears in more than one block, \opt{method(did)} stops and says so. Rerun \code{garf} with
+\opt{noreplacement} and a \opt{k()} the pool can supply (about $k$ controls per treated unit are
+needed, otherwise the units matched last get fewer or worse donors). Standard errors are then
+clustered by block, which is valid after matching without replacement (Abadie and Spiess, 2022).
+
+\medskip
+\noindent\textbf{\opt{method(gap)} --- treated minus its own donors, in levels.}
+\[
+\tau_i(e) \;=\; G_{i,T_0+e}.
+\]
+The gap itself, with no differencing, as the post-treatment gap of a synthetic control.
+Identifying assumption: \emph{unconfoundedness given the matched pre-treatment history}.
+Replacement is allowed: each treated unit keeps its best donors even if another treated unit uses
+them too. The gap is credible only if the gaps in the window are small: check the window rows and
+\code{e(mean\_window\_gap)}.
+
+\medskip
+\noindent\textbf{Report both.} The two estimate the same quantity under different assumptions,
+and under fairly general conditions they bracket the true effect (Ding and Li, 2019).
+
+\subsection{Event times, the overall ATT, and what the window rows mean}
+With $e = t - T_0$,
+\[
+\widehat{\text{ATT}}(e) = \frac{1}{N_e}\sum_{i:\,\tau_i(e)\ \text{defined}} \tau_i(e),\qquad
+\widehat{\text{ATT}} = \frac{1}{|\mathcal E_{\text{post}}|}\sum_{e\in\mathcal E_{\text{post}}}\widehat{\text{ATT}}(e),
+\]
+the overall ATT weighting every post-treatment event time shown equally (Callaway and
+Sant'Anna's dynamic aggregation). The table labels each period \code{pre} (before the window),
+\code{window} (inside it, for the matched outcome), \code{pre (window)} (inside it, for an outcome
+that was not matched on) and \code{post}.
+
+\noindent{\color{accent}\textbf{Window estimates are not a pre-trends test.}} With \code{did} they
+sum to zero by construction; with \code{gap} the outcome was matched on in the window, so they are
+small by construction. Evidence on pre-trends comes from periods \emph{before} the window, from an
+outcome that was not matched on, and from the backdated placebo (\code{DIAGNOSTICS/06\_placebo.do}).
+
+\subsection{Standard errors}
+Inference is conditional on the matched design (the forest and the weights are taken as given, as
+in propensity-score matching). Blocks are the clusters:
+\[
+\widehat V = \frac{G}{G-1}\sum_{i} d_i d_i',\qquad d_i(e) = \frac{\tau_i(e)-\widehat{\text{ATT}}(e)}{N_e},
+\]
+with $G$ treated units: the cluster-robust variance of the stacked regression below. When donors are
+shared between blocks (\code{gap} on a match with replacement) a donor shock moves several gaps at
+once, and \code{garfte} adds, for every shared donor $j$,
+\[
+\sum_j \Big[A_j(e)A_j(f) - \sum_i a_{ij}(e)a_{ij}(f)\Big]\,\widehat S_j(e,f),\qquad
+a_{ij}(e) = \tilde w_{ij}/N_e,\quad A_j(e)=\textstyle\sum_i a_{ij}(e),
+\]
+the covariance that donor $j$ creates across the blocks that share it; $\widehat S_j$ is the
+covariance across periods of donor outcomes around the counterfactual, estimated inside the blocks
+that use $j$. Without shared donors the correction is zero. In simulations with heavy donor reuse,
+block-clustered intervals without the correction covered the true effect about 90\% of the time at
+a nominal 95\%; with the correction, about 95\%. Critical values use Student's $t$ with $G-1$
+degrees of freedom; with fewer than about 30 treated units \code{garfte} warns that cluster-type
+standard errors can be unreliable.
+
+\subsection{Missing donor-periods, and the checks}
+If some donors have no outcome in a period, the weights are renormalised over the donors observed
+in that period; the number observed is reported per cell (\code{n\_donors\_obs}) and the number of
+renormalised cells is printed. Cells with no donor observed, or with the treated outcome missing,
+are skipped; with \code{did}, a treated unit with no gap in the window has no base and is left out.
+
+Before estimating, \code{garfte} checks that every block has one treated unit and that the donor
+weights of every block still sum to 1. If not, it stops with \emph{matched panel was modified}:
+typically, donors were dropped. Dropping whole periods, or whole blocks (e.g.\ to estimate a
+subgroup ATT), is allowed.
+
+\subsection{Files and graph}
+Written to \code{garf\_output/estimations/} (or as set above); earlier results of the same method
+there are replaced.
+
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+File & Contents\\
+\midrule
+\code{garfte\_}\emph{m}\code{\_event.csv} & one row per event time (name, e, year, period, att, se, t, p, lb, ub, n\_treated, mean\_donors\_obs) and a last row \code{ATT}\\
+\code{garfte\_}\emph{m}\code{\_units.csv} & the effect of \textbf{each treated unit in each period}: treated\_id, block\_id, year, e, period, tau, pre\_gap\_mean, n\_donors\_obs, n\_donors, ess, fmq\\
+\code{garfte\_}\emph{m}\code{\_vcov.csv} & full covariance matrix of the ATT$(e)$ and the ATT\\
+\code{garfte\_}\emph{m}\code{\_summary.csv} & key numbers (key,value)\\
+\code{garfte\_}\emph{m}\code{\_messages.txt} & the notes and warnings printed on screen\\
+\code{garfte\_}\emph{m}\code{.gph} / \code{.pdf} & event-study graph in the style of synthetic-control output: ATT$(e)$ as a line with its \opt{level()}\% confidence band, the matching window shaded, a dashed line at the start of the treatment, the overall ATT and its interval in the subtitle, the legend below the plot. Colours follow the current scheme (\code{set scheme}); in Stata 15+ band and window are transparent (Stata 14: fixed light colours)\\
+\bottomrule
+\end{tabularx}
+
+\subsection{Stored results}
+{\sloppy \code{garfte} is e-class. \code{e(b)} and \code{e(V)} hold ATT$(e)$, named \code{em}$k$ for $e=-k$ and
+\code{e}$k$ for $e=k\ge0$, and \code{ATT}, so \code{coefplot} and \code{test} work directly;
+\code{e(event)} is the event table as a matrix. Scalars: \code{e(att)}, \code{e(se\_att)},
+\code{e(lb\_att)}, \code{e(ub\_att)}, \code{e(p\_att)}, \code{e(level)}, \code{e(df\_r)},
+\code{e(N\_treated)}, \code{e(N\_donors)}, \code{e(donors\_reused)}, \code{e(t0)}, \code{e(npre)},
+\code{e(window\_first)}, \code{e(window\_last)}, \code{e(mean\_window\_gap)}. Macros: \code{e(cmd)},
+\code{e(method)}, \code{e(outcome)}, \code{e(matched\_outcome)}, \code{e(outdir)}.\par}
+\begin{stata}
+garfte, method(did)
+coefplot, vertical keep(e*)
+test em10 em9 em8 em7 em6          // periods before the window, jointly zero
+\end{stata}
+
+\subsection{Heterogeneity: the units file}
+\code{garfte\_}\emph{m}\code{\_units.csv} has one effect per treated unit and period, to relate to
+characteristics of the treated units. Two cautions. (i) Unit-level effects are noisy: the donor
+average removes noise from the counterfactual, not from the treated unit's own outcome, so their
+spread overstates the spread of the true effects; regressing them on characteristics is fine,
+reading their variance as heterogeneity is not. (ii) With shared donors they are correlated, and
+plain OLS standard errors of such a regression are too small; without shared donors, cluster by
+\code{treated\_id} when several periods are used.
+
+\subsection{Replicating \texttt{garfte} with a regression}
+The point estimates are those of a stacked regression with block-by-period fixed effects and the
+GARF weights (treated rows weight 1, donor weights summing to 1, so every block counts equally):
+\begin{stata}
+reghdfe Y ibn.year#c.treated_grp [pw=weight], absorb(garf_block#year) vce(cluster garf_block)
+\end{stata}
+reproduces \opt{method(gap)}; the same regression with the outcome measured from each unit's mean
+over the matching window reproduces \opt{method(did)}. With no shared donors the standard errors
+agree up to \code{reghdfe}'s small-sample factor. The quick DiD of the next section,
+\code{absorb(garf\_unit year)}, uses time effects common to all blocks: close to, but not the same
+as, the block-wise comparison of \code{garfte}.
+
+% =====================================================================
+\section{Your own estimator: from matched panel to treatment effect}
 
 After a default run the matched (block-expanded) panel is already in memory, and \code{garf} has
 added the variables you need for a weighted DiD:
@@ -818,6 +1055,19 @@ garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2) ///
       outdir("C:/work/garf_run1") python("C:/Python312/python.exe")
 \end{stata}
 
+\textbf{Estimation stage on a match without replacement: did, and gap as the bracketing estimate:}
+\begin{stata}
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2) noreplacement k(3)
+garfte, method(did) pre(5) post(5)
+garfte, method(gap) pre(5) post(5)
+\end{stata}
+
+\textbf{Estimation stage on a saved output folder:}
+\begin{stata}
+garf, treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2) noload store
+garfte using "garf_output", method(gap)
+\end{stata}
+
 \textbf{A subset of the panel (via \texttt{if}):}
 \begin{stata}
 garf if country=="IT", treatment(W) outcome(Y) id(id) time(year) t0(2000) tvarying(x1 x2)
@@ -919,6 +1169,17 @@ Stata option & config key\\
 \bottomrule
 \end{tabularx}
 
+\medskip
+\code{garfte} calls \code{garf\_estimate.py} with command-line options: \opt{method()},
+\opt{outcome()}, \opt{pre()}, \opt{post()}, \opt{level()} and \opt{outdir()} become
+\code{--method}, \code{--outcome}, \code{--pre}, \code{--post}, \code{--level} and \code{--outdir};
+\code{using} \emph{folder} becomes \code{--from} \emph{folder}; on the panel in memory, \code{garfte}
+exports it to a temporary CSV (\code{--panel}) and passes $T_0$, the window and the variable names
+from the characteristics \code{garf} stored. The same estimation runs from a terminal:
+\begin{console}
+python garf_estimate.py --from garf_output --method did --pre 5 --post 5
+\end{console}
+
 % =====================================================================
 \section{Troubleshooting}
 
@@ -938,9 +1199,23 @@ Windows path issues & Use forward slashes in \code{GARF\_HOME}/\code{outdir()} (
 \bottomrule
 \end{tabularx}
 
+\medskip
+\noindent\textbf{Messages from \code{garfte}.}\par
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.34\textwidth}X@{}}
+\toprule
+Message & Fix\\
+\midrule
+\emph{no GARF matched panel in memory} & Run \code{garf} (1.2 or newer) first, or \code{garfte using "garf\_output", method(\dots)} on a saved folder.\\
+\emph{matched panel was modified} & Donors were dropped from the matched panel. Rerun \code{garf}; dropping whole blocks or whole periods is fine.\\
+\emph{method(did) needs a panel matched WITHOUT replacement} & \code{garf \dots, noreplacement k(\#)} with a $k$ the donor pool can supply, or \opt{method(gap)}.\\
+\emph{estimation engine not found} & The package is older than 1.2: \code{engine/garf\_estimate.py} is missing.\\
+\emph{the estimation engine produced no results} & The Python side failed: run \code{python garf\_estimate.py --from \dots} from a terminal to see the error, or check that the interpreter has \code{scipy}.\\
+\bottomrule
+\end{tabularx}
+
 \vfill
 \begin{center}\small\color{cmt}
-GARF-binary · Stata integration · this guide documents \code{garf.ado} \textbf{version 1.1}.\\
+GARF-binary · Stata integration · this guide documents \code{garf.ado} and \code{garfte.ado} \textbf{version 1.2}.\\
 Federico Fantechi, PhD · Department of Economics, Business and Statistics · University of Palermo · \texttt{federico.fantechi@unipa.it}\\
 Comments, bugs and suggestions are very welcome.\\
 For the method itself, see the GARF working paper; for the engine, \code{README.txt} in the package.

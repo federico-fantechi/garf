@@ -15,7 +15,7 @@
 *  ---------------------------------------------------------------------------
 
 cd "$GARF_WORK"
-import delimited "garf_output/blocks.csv", clear varnames(1)
+import delimited "$GARF_OUTDIR/blocks.csv", clear varnames(1)
 
 tabstat fmq fmq_twin ess match_cooccurrence random_cooccurrence best_cooccurrence, ///
     stats(mean p10 p50 p90 min max) format(%5.3f)
